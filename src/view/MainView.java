@@ -10,6 +10,9 @@ import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
@@ -55,10 +58,53 @@ public final class MainView extends JFrame {
         setSize(1280, 800);
         setLocationRelativeTo(null);
         buildShell();
+        setJMenuBar(buildMenuBar());
     }
 
     public void setActions(Actions actions) {
         this.actions = actions;
+    }
+
+    private JMenuBar buildMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+
+        JMenu system = new JMenu("Hệ thống");
+        addMenuItem(system, "Tổng quan", () -> actions.navigate("dashboard"));
+        system.addSeparator();
+        addMenuItem(system, "Đăng xuất", this::logout);
+        menuBar.add(system);
+
+        JMenu management = new JMenu("Quản lý");
+        addMenuItem(management, "Danh sách sách", () -> actions.navigate("books"));
+        addMenuItem(management, "Thêm sách", () -> actions.add("books"));
+        management.addSeparator();
+        addMenuItem(management, "Tác giả", () -> actions.navigate("authors"));
+        addMenuItem(management, "Thể loại", () -> actions.navigate("genres"));
+        addMenuItem(management, "Nhà xuất bản", () -> actions.navigate("publishers"));
+        management.addSeparator();
+        addMenuItem(management, "Độc giả", () -> actions.navigate("readers"));
+        if (user.isAdmin()) {
+            addMenuItem(management, "Thủ thư & tài khoản", () -> actions.navigate("employees"));
+        }
+        menuBar.add(management);
+
+        JMenu loans = new JMenu("Mượn / Trả");
+        addMenuItem(loans, "Danh sách phiếu mượn", () -> actions.navigate("loans"));
+        addMenuItem(loans, "Lập phiếu mượn", () -> actions.createLoan());
+        menuBar.add(loans);
+
+        return menuBar;
+    }
+
+    private void addMenuItem(JMenu menu, String text, Runnable action) {
+        JMenuItem item = new JMenuItem(text);
+        item.addActionListener(event -> action.run());
+        menu.add(item);
+    }
+
+    private void logout() {
+        dispose();
+        actions.logout();
     }
 
     public void display(String key, TableData data) {
@@ -131,7 +177,7 @@ public final class MainView extends JFrame {
         userLabel.setText(user.fullName() + " · " + user.role());
         userLabel.setForeground(Color.WHITE);
         JButton logout = LibraryStyle.button("Đăng xuất", LibraryStyle.BEIGE, INK);
-        logout.addActionListener(event -> { dispose(); actions.logout(); });
+        logout.addActionListener(event -> logout());
         account.add(userLabel);
         account.add(logout);
         top.add(heading, BorderLayout.WEST);
