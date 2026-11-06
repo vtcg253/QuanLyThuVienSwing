@@ -16,7 +16,23 @@ src/
 └── database/
 ```
 
-`src` được cấu hình làm source root trong Maven. Các model hiện tại chứa dữ liệu dùng chung giữa các tầng; `LibraryDAO` phụ trách JDBC, còn `AppController` điều phối các màn hình nghiệp vụ.
+`src` được cấu hình làm source root trong Maven. Các model hiện tại chứa dữ liệu dùng chung giữa các tầng; các DAO trong `dao/` phụ trách JDBC, còn `AppController` điều phối các màn hình nghiệp vụ.
+
+## Các lớp DAO
+
+| File | Trách nhiệm |
+| --- | --- |
+| `AccountDAO.java` | Đăng nhập BCrypt và lưu tài khoản trên connection của nhân viên |
+| `BookDAO.java` | Danh sách, biểu mẫu, kiểm tra và quản lý sách |
+| `ReaderDAO.java` | Danh sách, biểu mẫu và quản lý độc giả |
+| `EmployeeDAO.java` | Quản lý nhân viên; lưu hồ sơ và tài khoản trong cùng transaction |
+| `CatalogDAO.java` | Thể loại, tác giả, nhà xuất bản |
+| `LoanDAO.java` | Danh sách phiếu, lập phiếu nhiều sách, trả sách và báo mất |
+| `StatisticsDAO.java` | Số liệu tổng quan và biểu đồ |
+| `RecordDAO.java` | Lớp cha dùng chung thao tác CRUD hồ sơ và transaction |
+| `DaoSupport.java` | Các hàm JDBC nội bộ: query, tham số, sinh mã và chuyển kiểu |
+
+`AppController` gọi trực tiếp các DAO theo chức năng; `DBConnection` tiếp tục mở kết nối Oracle. `LoanDAO` giữ toàn bộ transaction lập phiếu và chi tiết trên cùng connection. `EmployeeDAO` truyền connection của transaction vào `AccountDAO` khi lưu tài khoản.
 
 ## Yêu cầu
 
@@ -71,7 +87,7 @@ Ngày sinh của độc giả và thủ thư nhập dạng `dd/MM/yyyy` có sẵ
 
 ## Dữ liệu demo bổ sung
 
-File [sql/demo-data.sql](sql/demo-data.sql) thêm dữ liệu vào schema đã có, dùng mã riêng bắt đầu bằng `DM`:
+File [sql/demo-data.sql](sql/demo-data.sql) thêm dữ liệu vào schema đã có, dùng mã chuẩn `TL`, `TG`, `NXB`, `DG`, `NV`, `S`, `PM`:
 
 - 6 thể loại, 16 tác giả, 4 nhà xuất bản.
 - 30 sách, 16 độc giả có ngày sinh, số điện thoại và địa chỉ minh họa.
@@ -80,6 +96,18 @@ File [sql/demo-data.sql](sql/demo-data.sql) thêm dữ liệu vào schema đã c
 
 Chạy file bằng **Run Script (F5)** trong Oracle SQL Developer, trên kết nối/schema ứng dụng. Hai trigger mượn/trả phải đang bật và hợp lệ. Script dùng chúng để cập nhật tồn kho, không cập nhật kho thêm lần nữa.
 
-Các mã đã tồn tại sẽ được bỏ qua khi chạy lại; không xóa dữ liệu đang có. Script cũng bỏ hậu tố `(Demo)` trong tên thuộc bộ mẫu đã nạp trước đây và đổi hai tên đăng nhập mẫu cũ thành `thuthu_lan`, `thuthu_minh`. Các ngày mượn/hạn trả được tính theo ngày Oracle tại lần tạo đầu tiên, không tự dịch sang ngày mới khi chạy lại. Đây là thông tin minh họa để thử giao diện, phân trang và nghiệp vụ; tên, số điện thoại, địa chỉ và thông tin xuất bản không dùng làm dữ liệu thực.
+Các mã đã tồn tại sẽ được bỏ qua khi chạy lại; không xóa dữ liệu đang có. Mã mẫu đã được đối chiếu với schema hiện tại: sách S08–S37, thể loại TL09–TL14, tác giả TG16–TG31, NXB05–NXB08, độc giả DG05–DG20, nhân viên NV03–NV04, phiếu PM09–PM38. Khi nạp vào schema khác, cần kiểm tra mã để tránh bỏ qua nhầm bản ghi. Bảng đổi mã cũ/mới nằm tại `bao-cao/bang-doi-ma-demo.csv`; tiện ích `tools/NormalizeDemoCodes.java` chuyển mã cũ trong một transaction và kiểm tra dữ liệu trước khi commit. Script cũng bỏ hậu tố `(Demo)` trong tên thuộc bộ mẫu đã nạp trước đây và đổi hai tên đăng nhập mẫu cũ thành `thuthu_lan`, `thuthu_minh`. Các ngày mượn/hạn trả được tính theo ngày Oracle tại lần tạo đầu tiên, không tự dịch sang ngày mới khi chạy lại. Đây là thông tin minh họa để thử giao diện, phân trang và nghiệp vụ; tên, số điện thoại, địa chỉ và thông tin xuất bản không dùng làm dữ liệu thực.
 
 Trong bộ mẫu có 14 phiếu quá hạn (4 phiếu ban đầu và 10 phiếu bổ sung, trễ hạn 1–10 ngày tại lúc tạo).
+
+## Kiểm tra transaction DAO sau khi tách lớp
+
+Chạy kiểm tra với JDBC mô phỏng, không kết nối hoặc ghi vào Oracle:
+
+```bash
+mvn -o compile
+javac --release 17 -cp target/classes -d target/dao-check tools/VerifyDaoTransactions.java
+java -cp "target/dao-check:target/classes:$HOME/.m2/repository/org/mindrot/jbcrypt/0.4/jbcrypt-0.4.jar" VerifyDaoTransactions
+```
+
+Chín tình huống kiểm tra: commit phiếu và chi tiết, rollback khi thiếu sách, từ chối trả lặp, báo mất một phần/toàn bộ/vượt số lượng, lưu nhân viên cùng tài khoản, rollback hồ sơ khi tài khoản không hợp lệ và chặn xóa chính nhân viên đang đăng nhập. Kiểm tra này không thay thế kiểm thử tích hợp Oracle/trigger.

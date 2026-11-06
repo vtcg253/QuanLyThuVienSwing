@@ -1,6 +1,13 @@
 package controller;
 
-import dao.LibraryDAO;
+import dao.AccountDAO;
+import dao.BookDAO;
+import dao.CatalogDAO;
+import dao.EmployeeDAO;
+import dao.LoanDAO;
+import dao.ReaderDAO;
+import dao.RecordDAO;
+import dao.StatisticsDAO;
 import model.CatalogType;
 import model.LibraryUser;
 import model.RecordType;
@@ -20,10 +27,24 @@ import java.awt.Component;
 import java.util.Map;
 
 public final class AppController {
-    private final LibraryDAO repository = new LibraryDAO();
+    private final AccountDAO accounts = new AccountDAO();
+    private final BookDAO books = new BookDAO();
+    private final ReaderDAO readers = new ReaderDAO();
+    private final EmployeeDAO employees = new EmployeeDAO();
+    private final CatalogDAO catalogs = new CatalogDAO();
+    private final LoanDAO loans = new LoanDAO();
+    private final StatisticsDAO statistics = new StatisticsDAO();
     private DangNhapView loginFrame;
     private MainView mainFrame;
     private LibraryUser currentUser;
+
+    private RecordDAO recordDAO(RecordType type) {
+        return switch (type) {
+            case BOOKS -> books;
+            case READERS -> readers;
+            case EMPLOYEES -> employees;
+        };
+    }
 
     public void start() {
         loginFrame = new DangNhapView();
@@ -37,7 +58,7 @@ public final class AppController {
         new SwingWorker<LibraryUser, Void>() {
             @Override
             protected LibraryUser doInBackground() throws Exception {
-                return repository.login(username, password);
+                return accounts.login(username, password);
             }
 
             @Override
@@ -123,18 +144,18 @@ public final class AppController {
             private Map<String, Long> loanStatistics;
             @Override
             protected TableData doInBackground() throws Exception {
-                if ("loans".equals(page)) loanStatistics = repository.dashboardStatistics();
+                if ("loans".equals(page)) loanStatistics = statistics.dashboardStatistics();
                 return switch (page) {
-                    case "books" -> repository.listRecords(RecordType.BOOKS, search);
-                    case "readers" -> repository.listRecords(RecordType.READERS, search);
+                    case "books" -> books.listRecords(search);
+                    case "readers" -> readers.listRecords(search);
                     case "employees" -> {
                         requireAdmin();
-                        yield repository.listRecords(RecordType.EMPLOYEES, search);
+                        yield employees.listRecords(search);
                     }
-                    case "loans" -> repository.listLoans(search, status);
-                    case "genres" -> repository.listCatalog(CatalogType.THE_LOAI, search);
-                    case "authors" -> repository.listCatalog(CatalogType.TAC_GIA, search);
-                    case "publishers" -> repository.listCatalog(CatalogType.NHA_XUAT_BAN, search);
+                    case "loans" -> loans.listLoans(search, status);
+                    case "genres" -> catalogs.listCatalog(CatalogType.THE_LOAI, search);
+                    case "authors" -> catalogs.listCatalog(CatalogType.TAC_GIA, search);
+                    case "publishers" -> catalogs.listCatalog(CatalogType.NHA_XUAT_BAN, search);
                     default -> throw new IllegalArgumentException("Màn hình không hợp lệ.");
                 };
             }
@@ -155,7 +176,7 @@ public final class AppController {
         new SwingWorker<DashboardData, Void>() {
             @Override
             protected DashboardData doInBackground() throws Exception {
-                return new DashboardData(repository.dashboardStatistics(), repository.dashboardBooks());
+                return new DashboardData(statistics.dashboardStatistics(), statistics.dashboardBooks());
             }
 
             @Override
@@ -209,7 +230,7 @@ public final class AppController {
             if (popup != null) popup.setBusy(true);
             new SwingWorker<Void, Void>() {
                 @Override protected Void doInBackground() throws Exception {
-                    repository.saveCatalog(catalog, id, values); return null;
+                    catalogs.saveCatalog(catalog, id, values); return null;
                 }
                 @Override protected void done() {
                     try {
@@ -234,10 +255,10 @@ public final class AppController {
         if (type == RecordType.EMPLOYEES) requireAdmin();
         new SwingWorker<EditorData, Void>() {
             @Override protected EditorData doInBackground() throws Exception {
-                Map<CatalogType, TableData> catalogs = new java.util.EnumMap<>(CatalogType.class);
+                Map<CatalogType, TableData> catalogData = new java.util.EnumMap<>(CatalogType.class);
                 if (type == RecordType.BOOKS) for (CatalogType catalog : CatalogType.values())
-                    catalogs.put(catalog, repository.listCatalog(catalog, ""));
-                return new EditorData(id == null ? null : repository.recordFormValues(type, id), catalogs);
+                    catalogData.put(catalog, catalogs.listCatalog(catalog, ""));
+                return new EditorData(id == null ? null : recordDAO(type).recordFormValues(id), catalogData);
             }
             @Override protected void done() {
                 try {
@@ -272,8 +293,8 @@ public final class AppController {
             popup.setBusy(true);editor[0].setBusy(true);
             new SwingWorker<RecordEditorPanel.Choice, Void>() {
                 @Override protected RecordEditorPanel.Choice doInBackground() throws Exception {
-                    repository.saveCatalog(catalog, null, values);
-                    TableData entries = repository.listCatalog(catalog, values[0].trim());
+                    catalogs.saveCatalog(catalog, null, values);
+                    TableData entries = catalogs.listCatalog(catalog, values[0].trim());
                     for (Object[] row : entries.rows()) if (row[1].toString().equalsIgnoreCase(values[0].trim()))
                         return new RecordEditorPanel.Choice(row[0].toString(), row[1].toString());
                     throw new IllegalStateException("Không tìm thấy danh mục vừa tạo.");
@@ -291,11 +312,14 @@ public final class AppController {
         int length = type == RecordType.BOOKS ? 6 : 4;
         new SwingWorker<Void, Void>() {
             @Override protected Void doInBackground() throws Exception {
-                repository.saveRecord(type, id, java.util.Arrays.copyOf(values, length),
-                        type == RecordType.EMPLOYEES ? values[length] : null,
-                        type == RecordType.EMPLOYEES ? values[length + 1] : null,
-                        type == RecordType.EMPLOYEES && id != null ? values[length + 2] : "THU_THU",
-                        type != RecordType.EMPLOYEES || Boolean.parseBoolean(values[length + 3]));
+                String[] fields = java.util.Arrays.copyOf(values, length);
+                if (type == RecordType.EMPLOYEES) {
+                    employees.saveWithAccount(id, fields, values[length], values[length + 1],
+                            id != null ? values[length + 2] : "THU_THU",
+                            Boolean.parseBoolean(values[length + 3]));
+                } else {
+                    recordDAO(type).saveRecord(id, fields);
+                }
                 return null;
             }
             @Override protected void done() {
@@ -313,21 +337,21 @@ public final class AppController {
         }
         CatalogType catalog = catalogType(page);
         if (catalog != null) {
-            runAction(() -> repository.deleteCatalog(catalog, id), page);
+            runAction(() -> catalogs.deleteCatalog(catalog, id), page);
         } else {
             RecordType type = recordType(page);
             if (type == RecordType.EMPLOYEES && !currentUser.isAdmin()) {
                 showError("Chỉ ADMIN được quản lý nhân viên.");
                 return;
             }
-            runAction(() -> repository.deleteRecord(type, id, currentUser.employeeId()), page);
+            runAction(() -> recordDAO(type).deleteRecord(id, currentUser.employeeId()), page);
         }
     }
 
     private void createLoan() {
         new SwingWorker<TableData[], Void>() {
             @Override protected TableData[] doInBackground() throws Exception {
-                return new TableData[]{repository.listRecords(RecordType.READERS, ""), repository.listBooks("")};
+                return new TableData[]{readers.listRecords(""), books.listRecords("")};
             }
             @Override protected void done() {
                 try {
@@ -337,7 +361,7 @@ public final class AppController {
                         editor[0].setBusy(true);
                         new SwingWorker<String, Void>() {
                             @Override protected String doInBackground() throws Exception {
-                                return repository.createLoan(request.readerId(), request.borrowed(), request.due(), request.books(), currentUser.employeeId());
+                                return loans.createLoan(request.readerId(), request.borrowed(), request.due(), request.books(), currentUser.employeeId());
                             }
                             @Override protected void done() {
                                 try { get(); reload("loans", "", "ALL"); }
@@ -355,7 +379,7 @@ public final class AppController {
         if (!confirmLoanAction("Đánh dấu đã trả sách này?")) return;
         String loanId = row[0].toString();
         String bookId = row[6].toString();
-        runLoanAction(() -> repository.returnBook(loanId, bookId), loanId);
+        runLoanAction(() -> loans.returnBook(loanId, bookId), loanId);
     }
 
     private void reportLost(Object[] row) {
@@ -371,7 +395,7 @@ public final class AppController {
                 showError("Số lượng báo mất phải từ 1 đến " + (borrowed - alreadyLost) + ".");
                 return;
             }
-            runLoanAction(() -> repository.reportLost(loanId, bookId, value), loanId);
+            runLoanAction(() -> loans.reportLost(loanId, bookId, value), loanId);
         } catch (NumberFormatException exception) {
             showError("Số lượng mất phải là số nguyên.");
         }
@@ -392,8 +416,8 @@ public final class AppController {
             @Override protected LoanRefresh doInBackground() throws Exception {
                 action.run();
                 saved = true;
-                return new LoanRefresh(repository.listLoans(search,status), repository.listLoans(loanId,"ALL"),
-                        repository.dashboardStatistics());
+                return new LoanRefresh(loans.listLoans(search,status), loans.listLoans(loanId,"ALL"),
+                        statistics.dashboardStatistics());
             }
             @Override protected void done() {
                 try {
