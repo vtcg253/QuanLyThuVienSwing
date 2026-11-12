@@ -51,14 +51,36 @@ public final class LoanDAO {
     public String createLoan(String readerId, LocalDate borrowDate, LocalDate dueDate,
                              Map<String, Integer> requestedBooks, String employeeId) throws SQLException {
         if (readerId == null || readerId.isBlank() || borrowDate == null || dueDate == null
-                || dueDate.isBefore(borrowDate) || requestedBooks.isEmpty()) {
+                || dueDate.isBefore(borrowDate) || requestedBooks == null || requestedBooks.isEmpty()) {
             throw new IllegalArgumentException("Hãy nhập độc giả, ngày hợp lệ và ít nhất một sách.");
+        }
+        readerId = model.InputValidation.code(readerId, "Mã độc giả");
+        employeeId = model.InputValidation.code(employeeId, "Mã nhân viên");
+        if (borrowDate.getYear() < 1 || dueDate.getYear() > 9999)
+            throw new IllegalArgumentException("Ngày mượn và hạn trả phải thuộc năm 1–9999.");
+        long totalQuantity = 0;
+        for (Map.Entry<String, Integer> item : requestedBooks.entrySet()) {
+            String bookId = model.InputValidation.code(item.getKey(), "Mã sách");
+            if (!bookId.equals(item.getKey())) throw new IllegalArgumentException("Mã sách không được chứa khoảng trắng ở hai đầu.");
+            if (item.getValue() == null || item.getValue() <= 0)
+                throw new IllegalArgumentException("Số lượng mượn phải là số nguyên dương.");
+            totalQuantity += item.getValue();
+            if (totalQuantity > 5)
+                throw new IllegalArgumentException("Mỗi phiếu chỉ được mượn tối đa 5 cuốn sách (tổng số lượng tất cả các dòng).");
         }
         try (Connection connection = DBConnection.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                if (!exists(connection, "SELECT 1 FROM DOCGIA WHERE MADG = ?", readerId)) {
+                // Serialize new loans for the same reader before checking their open loans.
+                if (!exists(connection, "SELECT 1 FROM DOCGIA WHERE MADG = ? FOR UPDATE", readerId)) {
                     throw new SQLException("Không tìm thấy độc giả " + readerId + ".");
+                }
+                if (exists(connection, """
+                        SELECT 1 FROM PHIEUMUON p
+                        JOIN CT_PHIEUMUON c ON c.MAPM = p.MAPM
+                        WHERE p.MADG = ? AND c.TRANGTHAI = 'BORROWED'
+                        """, readerId)) {
+                    throw new SQLException("Độc giả còn sách chưa trả. Vui lòng trả hết sách trước khi mượn tiếp.");
                 }
                 if (!exists(connection, "SELECT 1 FROM NHANVIEN WHERE MANV = ?", employeeId)) {
                     throw new SQLException("Tài khoản chưa được liên kết với hồ sơ nhân viên.");
@@ -111,6 +133,8 @@ public final class LoanDAO {
     }
 
     public void returnBook(String loanId, String bookId) throws SQLException {
+        loanId = model.InputValidation.code(loanId, "Mã phiếu mượn");
+        bookId = model.InputValidation.code(bookId, "Mã sách");
         try (Connection connection = DBConnection.getConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -134,6 +158,8 @@ public final class LoanDAO {
     }
 
     public void reportLost(String loanId, String bookId, int quantityLost) throws SQLException {
+        loanId = model.InputValidation.code(loanId, "Mã phiếu mượn");
+        bookId = model.InputValidation.code(bookId, "Mã sách");
         if (quantityLost <= 0) {
             throw new IllegalArgumentException("Số lượng mất phải lớn hơn 0.");
         }

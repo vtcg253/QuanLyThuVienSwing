@@ -33,15 +33,21 @@ public final class CatalogDAO {
     }
 
     public void saveCatalog(CatalogType type, String id, String[] values) throws SQLException {
+        model.InputValidation.catalog(type, values);
         String[] columns = type.formColumns();
         if (values.length != columns.length) {
             throw new IllegalArgumentException("Dữ liệu danh mục không hợp lệ.");
         }
-        String[] cleanValues = java.util.Arrays.stream(values).map(String::trim).toArray(String[]::new);
+        String[] cleanValues = java.util.Arrays.stream(values).map(value -> value == null ? "" : value.trim()).toArray(String[]::new);
         if (cleanValues[0].isBlank()) {
             throw new IllegalArgumentException("Tên danh mục không được để trống.");
         }
         try (Connection connection = DBConnection.getConnection()) {
+            if (id != null && !id.isBlank()) {
+                model.InputValidation.code(id, "Mã danh mục");
+                if (!exists(connection, "SELECT 1 FROM " + type.table() + " WHERE " + type.idColumn() + " = ?", id))
+                    throw new SQLException("Danh mục không còn tồn tại. Vui lòng tải lại danh sách.");
+            }
             ensureUnique(connection, type.table(), type.nameColumn(), cleanValues[0], type.idColumn(), id);
             if (id == null || id.isBlank()) {
                 String newId = nextCode(connection, type.table(), type.idColumn(), type.prefix());
@@ -58,7 +64,15 @@ public final class CatalogDAO {
     }
 
     public void deleteCatalog(CatalogType type, String id) throws SQLException {
-        deleteById(type.table(), type.idColumn(), id);
+        if (type == null) throw new IllegalArgumentException("Danh mục không hợp lệ.");
+        model.InputValidation.code(id, "Mã danh mục");
+        try (Connection connection = DBConnection.getConnection()) {
+            if (!exists(connection, "SELECT 1 FROM " + type.table() + " WHERE " + type.idColumn() + " = ?", id))
+                throw new SQLException("Danh mục không còn tồn tại. Vui lòng tải lại danh sách.");
+            if (exists(connection, "SELECT 1 FROM SACH WHERE " + type.idColumn() + " = ?", id))
+                throw new SQLException("Không thể xóa " + type.title().toLowerCase(java.util.Locale.ROOT) + " đang được sử dụng trong sách.");
+            execute(connection, "DELETE FROM " + type.table() + " WHERE " + type.idColumn() + " = ?", new Object[]{id});
+        }
     }
 
     private void ensureUnique(Connection connection, String table, String column, String value,

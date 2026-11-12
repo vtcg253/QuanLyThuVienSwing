@@ -138,9 +138,9 @@ final class BooksPanel extends JPanel {
         // Detach the previous page filter before replacing the result set.
         table.setRowSorter(null);
         sourceRows = data.rows();
-        dataColumns = "employees".equals(page) ? 6 : data.columns().length;
+        dataColumns = "employees".equals(page) ? 5 : data.columns().length;
         String[] headers = "employees".equals(page)
-                ? new String[]{"Mã", "Họ và tên", "Ngày sinh", "Số điện thoại", "Tài khoản", "Trạng thái", ""}
+                ? new String[]{"Mã", "Họ và tên", "Ngày sinh", "Số điện thoại", "Tài khoản", ""}
                 : java.util.Arrays.copyOf(data.columns(), dataColumns + 1);
         headers[dataColumns] = bookMode ? "" : "Thao tác";
         if (!bookMode) headers[0] = "Mã";
@@ -152,7 +152,6 @@ final class BooksPanel extends JPanel {
             if ("employees".equals(page)) {
                 System.arraycopy(source, 0, rows[i], 0, 4);
                 rows[i][4] = source[5];
-                rows[i][5] = source[5] == null ? "Chưa có tài khoản" : "Y".equals(source[7]) ? "Đang hoạt động" : "Đã khóa";
             } else System.arraycopy(source, 0, rows[i], 0, dataColumns);
         }
         table.setModel(new DefaultTableModel(rows, headers) {
@@ -190,13 +189,6 @@ final class BooksPanel extends JPanel {
             cell.setSize(t.getColumnModel().getColumn(col).getWidth(), t.getRowHeight());
             cell.doLayout();
             return cell;
-        });
-        if ("employees".equals(page)) table.getColumnModel().getColumn(5).setCellRenderer((t, value, selected, focus, row, col) -> {
-            JPanel cell = new JPanel(new FlowLayout(FlowLayout.LEFT, 7, 15));
-            cell.setBackground(selected ? t.getSelectionBackground() : PAPER);
-            boolean active = "Đang hoạt động".equals(value);
-            cell.add(LibraryStyle.badge(String.valueOf(value), active ? new Color(216,242,229) : new Color(246,234,224), active ? GREEN : MUTED));
-            cell.setSize(t.getColumnModel().getColumn(col).getWidth(), t.getRowHeight());cell.doLayout();return cell;
         });
         table.getRowSorter().addRowSorterListener(event -> {
             if (event.getType() == javax.swing.event.RowSorterEvent.Type.SORT_ORDER_CHANGED)

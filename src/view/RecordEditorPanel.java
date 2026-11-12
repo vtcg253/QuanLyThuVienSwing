@@ -46,7 +46,7 @@ public final class RecordEditorPanel extends JPanel {
                 JPanel group=clear(new BorderLayout(8,0));group.add(choices,BorderLayout.CENTER);
                 JButton add=button("+ Thêm",BEIGE,INK);group.add(add,BorderLayout.EAST);
                 add.addActionListener(event->quickAdd.accept(catalog, choice->{choices.addItem(choice);choices.setSelectedItem(choice);}));
-                fieldAt(catalog.title(),group,i,1);
+                fieldAt(catalog.title() + " *",group,i,1);
                 values.add(()->{
                     Choice chosen=(Choice)choices.getSelectedItem();
                     return chosen==null?"":chosen.id();
@@ -111,10 +111,9 @@ public final class RecordEditorPanel extends JPanel {
             try {
                 String[] result=values.stream().map(Supplier::get).toArray(String[]::new);
                 for (int i=0;i<result.length;i++) if(type!=RecordType.EMPLOYEES||i!=5) result[i]=result[i].trim();
-                if(result[0].isBlank())throw new IllegalArgumentException("Vui lòng nhập " + (type==RecordType.BOOKS?"tên sách.":"họ và tên."));
-                if(type==RecordType.BOOKS&&!result[4].isBlank()) {
-                    int year=Integer.parseInt(result[4]);if(year<1)throw new IllegalArgumentException("Năm xuất bản phải là số nguyên dương.");
-                }
+                model.InputValidation.record(type, result);
+                if (type == RecordType.EMPLOYEES)
+                    model.InputValidation.account(result[4], result[5], result[6], id == null || value(account,0).isBlank());
                 message.setVisible(false);onSave.accept(result);
             }catch(RuntimeException ex){message.setVisible(true);message.setText(ex instanceof java.time.format.DateTimeParseException?"Ngày sinh không hợp lệ. Vui lòng nhập dd/MM/yyyy.":ex.getMessage());}
         });

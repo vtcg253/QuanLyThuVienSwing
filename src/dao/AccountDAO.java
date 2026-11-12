@@ -12,6 +12,11 @@ import java.sql.SQLException;
 
 public final class AccountDAO {
     public LibraryUser login(String username, char[] password) throws SQLException {
+        model.InputValidation.text(username, "Tên đăng nhập", 50, true);
+        if (password == null || password.length == 0)
+            throw new IllegalArgumentException("Mật khẩu không được để trống.");
+        if (new String(password).getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
+            throw new IllegalArgumentException("Mật khẩu không được vượt quá 72 byte UTF-8.");
         String sql = """
                 SELECT n.MANV, n.HOTEN, t.MATKHAU, t.VAITRO
                 FROM TAIKHOAN t JOIN NHANVIEN n ON n.MANV = t.MANV
@@ -40,11 +45,14 @@ public final class AccountDAO {
             throw new IllegalArgumentException("Tên đăng nhập nhân viên không được để trống.");
         }
         boolean exists = exists(connection, "SELECT 1 FROM TAIKHOAN WHERE MANV = ?", employeeId);
-        if (!exists && (password == null || password.length() < 6)) {
-            throw new IllegalArgumentException("Mật khẩu tài khoản mới phải có ít nhất 6 ký tự.");
-        }
-        if (password != null && !password.isBlank() && password.length() < 6) {
-            throw new IllegalArgumentException("Mật khẩu mới phải có ít nhất 6 ký tự.");
+        model.InputValidation.account(username, password, role, !exists);
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT 1 FROM TAIKHOAN WHERE TENDANGNHAP = ? AND MANV <> ?")) {
+            statement.setString(1, username.trim());
+            statement.setString(2, employeeId);
+            try (ResultSet result = statement.executeQuery()) {
+                if (result.next()) throw new SQLException("Tên đăng nhập đã được sử dụng.");
+            }
         }
         String hashedPassword = password == null || password.isBlank() ? null : BCrypt.hashpw(password, BCrypt.gensalt(10));
         String active = enabled ? "Y" : "N";

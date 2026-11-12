@@ -236,6 +236,7 @@ public final class AppController {
                     try {
                         get();
                         if (popup != null) popup.dispose();
+                        showSaveSuccess(id);
                         reload(page, "", "ALL");
                     } catch (Exception exception) {
                         if (popup != null) popup.setBusy(false);
@@ -300,7 +301,7 @@ public final class AppController {
                     throw new IllegalStateException("Không tìm thấy danh mục vừa tạo.");
                 }
                 @Override protected void done() {
-                    try { RecordEditorPanel.Choice choice=get();select.accept(choice);popup.dispose(); }
+                    try { RecordEditorPanel.Choice choice=get();select.accept(choice);popup.dispose();showSaveSuccess(null); }
                     catch (Exception exception) { popup.setBusy(false);editor[0].showError("Không thể lưu: " + rootMessage(exception)); }
                 }
             }.execute();
@@ -323,7 +324,7 @@ public final class AppController {
                 return null;
             }
             @Override protected void done() {
-                try { get(); if (popup != null) popup.dispose();reload(page, "", "ALL"); }
+                try { get(); if (popup != null) popup.dispose();showSaveSuccess(id);reload(page, "", "ALL"); }
                 catch (Exception exception) { if (popup != null) popup.setBusy(false);editor.showError("Không thể lưu: " + rootMessage(exception)); }
             }
         }.execute();
@@ -364,7 +365,11 @@ public final class AppController {
                                 return loans.createLoan(request.readerId(), request.borrowed(), request.due(), request.books(), currentUser.employeeId());
                             }
                             @Override protected void done() {
-                                try { get(); reload("loans", "", "ALL"); }
+                                try {
+                                    get();
+                                    RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã lập phiếu mượn thành công."));
+                                    reload("loans", "", "ALL");
+                                }
                                 catch (Exception exception) { editor[0].showError("Không thể lập phiếu: " + rootMessage(exception)); }
                             }
                         }.execute();
@@ -448,7 +453,7 @@ public final class AppController {
                 try {
                     get();
                     if (mainFrame.isDisplayable()) {
-                        RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã lưu thành công."));
+                        RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã xóa thành công."));
                         reload(page, "", "ALL");
                     }
                 } catch (Exception exception) {
@@ -456,6 +461,11 @@ public final class AppController {
                 }
             }
         }.execute();
+    }
+
+    private void showSaveSuccess(String id) {
+        RecordFormDialog.showContent(mainFrame, "Hoàn tất",
+                new JLabel(id == null ? "Đã thêm thành công." : "Đã cập nhật thành công."));
     }
 
     private void requireAdmin() {
@@ -491,6 +501,17 @@ public final class AppController {
         Throwable current = exception;
         while (current.getCause() != null && current.getCause() != current) {
             current = current.getCause();
+        }
+        if (current instanceof java.sql.SQLException sql) {
+            switch (sql.getErrorCode()) {
+                case 2292: return "Không thể xóa dữ liệu đang được sử dụng hoặc đã có lịch sử giao dịch.";
+                case 2291: return "Dữ liệu liên quan không còn tồn tại. Vui lòng tải lại và chọn lại.";
+                case 1: return "Mã hoặc thông tin duy nhất đã tồn tại. Vui lòng kiểm tra và thử lại.";
+                case 12899: return "Nội dung nhập vượt quá độ dài cho phép. Vui lòng rút ngắn thông tin.";
+                case 1400: return "Vui lòng nhập đầy đủ các thông tin bắt buộc.";
+                case 2290: return "Dữ liệu không hợp lệ theo quy tắc hệ thống. Vui lòng kiểm tra lại.";
+                default: break;
+            }
         }
         String message = current.getMessage();
         return message == null || message.isBlank() ? current.getClass().getSimpleName() : message;

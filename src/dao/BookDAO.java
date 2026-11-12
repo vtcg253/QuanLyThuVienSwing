@@ -44,7 +44,7 @@ public final class BookDAO extends RecordDAO {
 
     @Override
     protected void checkDelete(Connection connection, String id, String currentEmployeeId) throws SQLException {
-        if (exists(connection, "SELECT 1 FROM CT_PHIEUMUON WHERE MASACH = ? AND TRANGTHAI = 'BORROWED'", id))
-            throw new SQLException("Không thể xóa sách đang được mượn.");
+        if (exists(connection, "SELECT 1 FROM CT_PHIEUMUON WHERE MASACH = ?", id))
+            throw new SQLException("Không thể xóa sách đã có lịch sử mượn trả.");
     }
 }

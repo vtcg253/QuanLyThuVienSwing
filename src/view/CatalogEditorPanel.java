@@ -22,6 +22,8 @@ public final class CatalogEditorPanel extends JPanel {
         card.add(form);JPanel footer=clear(new BorderLayout(0,10));message.setVisible(false);footer.add(message,BorderLayout.NORTH);JPanel controls=clear(new FlowLayout(FlowLayout.LEFT,0,0));controls.add(save);controls.add(Box.createHorizontalStrut(8));controls.add(cancel);footer.add(controls,BorderLayout.SOUTH);card.add(footer,BorderLayout.SOUTH);
         JPanel wrap=clear(new BorderLayout());wrap.add(card,BorderLayout.NORTH);add(scroll(wrap));
         save.addActionListener(event->{String[] values=java.util.Arrays.stream(fields).map(JTextField::getText).map(String::trim).toArray(String[]::new);
+            try { model.InputValidation.catalog(type, values); }
+            catch (IllegalArgumentException ex) { showError(ex.getMessage()); return; }
             if(values[0].isBlank()){message.setVisible(true);message.setText("Vui lòng nhập "+labels[0].toLowerCase(java.util.Locale.ROOT)+".");return;}message.setVisible(false);onSave.accept(values);});
         cancel.addActionListener(event->onCancel.run());
     }

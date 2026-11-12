@@ -47,9 +47,26 @@ public abstract class RecordDAO {
     }
 
     protected final String saveValues(Connection connection, String id, String[] values) throws SQLException {
-        if (values.length != columns.length) throw new IllegalArgumentException("Dữ liệu biểu mẫu không hợp lệ.");
-        if (values[0].isBlank()) throw new IllegalArgumentException(
-                "SACH".equals(table) ? "Tên sách không được để trống." : "Họ tên không được để trống.");
+        if (values == null || values.length != columns.length) throw new IllegalArgumentException("Dữ liệu biểu mẫu không hợp lệ.");
+        model.InputValidation.record("SACH".equals(table) ? model.RecordType.BOOKS
+                : "DOCGIA".equals(table) ? model.RecordType.READERS : model.RecordType.EMPLOYEES, values);
+        values = java.util.Arrays.stream(values).map(value -> value == null ? "" : value.trim()).toArray(String[]::new);
+        if (id != null && !id.isBlank()) {
+            model.InputValidation.code(id, "Mã hồ sơ");
+            if (!exists(connection, "SELECT 1 FROM " + table + " WHERE " + idColumn + " = ?", id))
+                throw new SQLException("Dữ liệu không còn tồn tại. Vui lòng tải lại danh sách.");
+        }
+        if ("SACH".equals(table)) {
+            String[] tables = {"THELOAI", "TACGIA", "NHAXUATBAN"};
+            String[] keys = {"MATL", "MATG", "MANXB"};
+            String[] labels = {"Thể loại", "Tác giả", "Nhà xuất bản"};
+            for (int i = 0; i < tables.length; i++) {
+                String value = values[i + 1];
+                if (!value.isBlank() && !exists(connection,
+                        "SELECT 1 FROM " + tables[i] + " WHERE " + keys[i] + " = ?", value))
+                    throw new SQLException(labels[i] + " không còn tồn tại. Vui lòng chọn lại.");
+            }
+        }
         Object[] parameters = convertValues(values);
         if (id == null || id.isBlank()) {
             String newId = nextCode(connection, table, idColumn, prefix);
@@ -80,6 +97,9 @@ public abstract class RecordDAO {
         try (Connection connection = DBConnection.getConnection()) {
             connection.setAutoCommit(false);
             try {
+                model.InputValidation.code(id, "Mã hồ sơ");
+                if (!exists(connection, "SELECT 1 FROM " + table + " WHERE " + idColumn + " = ?", id))
+                    throw new SQLException("Dữ liệu không còn tồn tại. Vui lòng tải lại danh sách.");
                 checkDelete(connection, id, currentEmployeeId);
                 execute(connection, "DELETE FROM " + table + " WHERE " + idColumn + " = ?", new Object[]{id});
                 connection.commit();

@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 public class VerifyDaoTransactions {
     static int commits,rollbacks;
-    static boolean missingStock, failReturn;
+    static boolean missingStock, failReturn, duplicateUsername, readerHasOpenLoan;
     static int quantity=3,lost=0;
     static final List<String> writes=new ArrayList<>();
     static Object proxy(Class<?> type,InvocationHandler handler){return Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},handler);}
@@ -20,8 +20,11 @@ public class VerifyDaoTransactions {
         }return fallback(m.getReturnType());
     });}
     static ResultSet query(String sql){
+        if(sql.contains("WHERE p.MADG = ? AND c.TRANGTHAI = 'BORROWED'"))
+            return rows(readerHasOpenLoan?Collections.singletonList(new Object[]{1}):List.of());
         if(sql.contains("SELECT SOLUONG FROM SACH"))return rows(missingStock?List.of():Collections.singletonList(new Object[]{10}));
         if(sql.contains("SELECT SOLUONG, SOLUONGMAT"))return rows(Collections.singletonList(new Object[]{quantity,lost}));
+        if(sql.contains("FROM TAIKHOAN WHERE TENDANGNHAP"))return rows(duplicateUsername?Collections.singletonList(new Object[]{1}):List.of());
         if(sql.contains("FROM TAIKHOAN WHERE MANV"))return rows(List.of());
         return rows(Collections.singletonList(new Object[]{1}));
     }
@@ -39,7 +42,7 @@ public class VerifyDaoTransactions {
             case "rollback":rollbacks++;return null;
         }return fallback(m.getReturnType());
     });}
-    static void reset(){commits=rollbacks=0;writes.clear();missingStock=failReturn=false;quantity=3;lost=0;}
+    static void reset(){commits=rollbacks=0;writes.clear();missingStock=failReturn=duplicateUsername=readerHasOpenLoan=false;quantity=3;lost=0;}
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     static void expectedFailure(RunnableSQL action)throws Exception{try{action.run();throw new AssertionError("Expected rejection");}catch(SQLException|IllegalArgumentException expected){}}
     interface RunnableSQL{void run()throws Exception;}
@@ -65,6 +68,25 @@ public class VerifyDaoTransactions {
         reset();employees.saveWithAccount(null,person,"tester","123456","THU_THU",true);check(commits==1&&rollbacks==0&&writes.size()==2,"Employee and account must commit together");
         reset();expectedFailure(()->employees.saveWithAccount(null,person,"tester","123","THU_THU",true));check(commits==0&&rollbacks==1&&writes.size()==1,"Invalid account must rollback employee insert");
         reset();expectedFailure(()->employees.deleteRecord("NV01","NV01"));check(commits==0&&rollbacks==1&&writes.isEmpty(),"Cannot delete signed-in employee");
-        System.out.println("PASS: 9 transaction and business validation cases (simulated JDBC, no live database writes).");
+        reset();expectedFailure(()->new BookDAO().deleteRecord("S01","NV01"));
+        check(writes.isEmpty()&&rollbacks==1,"Book with any loan history cannot be deleted");
+        reset();expectedFailure(()->new CatalogDAO().deleteCatalog(model.CatalogType.THE_LOAI,"TL01"));
+        check(writes.isEmpty(),"Referenced catalog cannot be deleted");
+        reset();duplicateUsername=true;expectedFailure(()->employees.saveWithAccount(null,person,"tester","123456","THU_THU",true));
+        check(commits==0&&rollbacks==1&&writes.size()==1,"Duplicate username rolls back employee insert");
+        reset();expectedFailure(()->loans.createLoan("DG01",today,today,null,"NV01"));
+        check(writes.isEmpty(),"Null book request rejected before writes");
+        reset();readerHasOpenLoan=true;
+        expectedFailure(()->loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",1),"NV01"));
+        check(commits==0&&rollbacks==1&&writes.isEmpty(),"Reader with unreturned books must be rejected before inserting a loan");
+        reset();loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",1),"NV01");
+        check(commits==1&&writes.size()==2,"Reader with no borrowed lines can borrow again");
+        reset();loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",3,"S02",2),"NV01");
+        check(commits==1&&writes.size()==3,"Exactly five copies across multiple titles accepted");
+        reset();expectedFailure(()->loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",3,"S02",3),"NV01"));
+        check(writes.isEmpty()&&commits==0,"Six copies across titles rejected before writes");
+        reset();expectedFailure(()->loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",6),"NV01"));
+        check(writes.isEmpty(),"Six copies of one title rejected");
+        System.out.println("PASS: 18 transaction and business validation cases (simulated JDBC, no live database writes).");
     }
 }
