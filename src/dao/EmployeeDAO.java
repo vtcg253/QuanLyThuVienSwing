@@ -19,7 +19,9 @@ public final class EmployeeDAO extends RecordDAO {
                 SELECT n.MANV, n.HOTEN, n.NGAYSINH, n.SDT, n.DIACHI,
                        t.TENDANGNHAP, t.VAITRO, t.KICHHOAT
                 FROM NHANVIEN n LEFT JOIN TAIKHOAN t ON t.MANV = n.MANV
-                WHERE UPPER(n.MANV) LIKE ? OR UPPER(n.HOTEN) LIKE ? ORDER BY n.MANV
+                WHERE (t.TENDANGNHAP IS NULL OR LOWER(t.TENDANGNHAP) <> 'admin')
+                  AND (UPPER(n.MANV) LIKE ? OR UPPER(n.HOTEN) LIKE ?)
+                ORDER BY n.MANV
                 """, new String[]{"Mã nhân viên", "Họ tên", "Ngày sinh", "Điện thoại",
                 "Địa chỉ", "Tên đăng nhập", "Vai trò", "Kích hoạt"}, like(search), like(search));
     }

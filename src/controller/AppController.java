@@ -331,6 +331,10 @@ public final class AppController {
     }
 
     private void deleteRecord(String page, Object[] row) {
+        if (currentUser == null || !currentUser.isAdmin()) {
+            showError("Chỉ ADMIN được phép xóa dữ liệu.");
+            return;
+        }
         String id = row[0].toString();
         if (!RecordFormDialog.confirm(mainFrame, "Xác nhận xóa",
                 new JLabel("Bạn có chắc muốn xóa mã " + id + "?"), "Xóa")) {

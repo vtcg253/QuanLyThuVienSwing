@@ -233,7 +233,9 @@ final class BooksPanel extends JPanel {
         deleteButton.setBorder(BorderFactory.createEmptyBorder(7, 10, 7, 10));
         if (onEdit != null) editButton.addActionListener(event -> onEdit.run());
         if (onDelete != null) deleteButton.addActionListener(event -> onDelete.run());
-        panel.add(editButton); panel.add(deleteButton); return panel;
+        panel.add(editButton);
+        if (delete != null) panel.add(deleteButton);
+        return panel;
     }
 
     private final class ActionEditor extends AbstractCellEditor implements TableCellEditor {

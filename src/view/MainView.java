@@ -289,7 +289,8 @@ public final class MainView extends JFrame {
                 panel.add(loansPanel);
             } else {
                 recordsPanel = new BooksPanel(key, term -> actions.reload(key, term, "ALL"),
-                        () -> actions.add(key), row -> actions.edit(key, row), row -> actions.delete(key, row));
+                        () -> actions.add(key), row -> actions.edit(key, row),
+                        user.isAdmin() ? row -> actions.delete(key, row) : null);
                 panel.add(recordsPanel, BorderLayout.CENTER);
             }
         }
