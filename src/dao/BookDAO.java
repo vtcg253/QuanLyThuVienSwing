@@ -7,14 +7,14 @@ import static dao.DaoSupport.*;
 
 public final class BookDAO extends RecordDAO {
     public BookDAO() {
-        super("SACH", "MASACH", "S", "TENSACH", "MATL", "MATG", "MANXB", "NAMXUATBAN", "SOLUONG");
+        super("SACH", "MASACH", "S", "TENSACH", "MATL", "MATG", "MANXB", "NAMXUATBAN", "SOLUONG", "GIABAN");
     }
 
     @Override
     public TableData listRecords(String search) throws SQLException {
         String sql = """
                 SELECT s.MASACH, s.TENSACH, tl.TENTHELOAI, tg.TENTACGIA, nxb.TENNXB,
-                       s.NAMXUATBAN, s.SOLUONG
+                       s.NAMXUATBAN, s.SOLUONG, s.GIABAN
                 FROM SACH s
                 LEFT JOIN THELOAI tl ON tl.MATL = s.MATL
                 LEFT JOIN TACGIA tg ON tg.MATG = s.MATG
@@ -26,12 +26,12 @@ public final class BookDAO extends RecordDAO {
                 """;
         String term = like(search);
         return query(sql, new String[]{"Mã sách", "Tên sách", "Thể loại", "Tác giả",
-                "Nhà xuất bản", "Năm xuất bản", "Tồn kho"}, term, term, term, term, term);
+                "Nhà xuất bản", "Năm xuất bản", "Tồn kho", "Giá (VNĐ)"}, term, term, term, term, term);
     }
 
     @Override
     protected String formSql() {
-        return "SELECT TENSACH, MATL, MATG, MANXB, NAMXUATBAN, SOLUONG FROM SACH WHERE MASACH = ?";
+        return "SELECT TENSACH, MATL, MATG, MANXB, NAMXUATBAN, SOLUONG, GIABAN FROM SACH WHERE MASACH = ?";
     }
 
     @Override
@@ -39,7 +39,10 @@ public final class BookDAO extends RecordDAO {
         String[] clean = java.util.Arrays.stream(values).map(String::trim).toArray(String[]::new);
         Integer year = clean[4].isBlank() ? null : parsePositiveInt(clean[4], "Năm xuất bản");
         int quantity = parseNonNegativeInt(clean[5], "Tồn kho");
-        return new Object[]{clean[0], nullable(clean[1]), nullable(clean[2]), nullable(clean[3]), year, quantity};
+        long price;
+        try { price = Long.parseLong(clean[6]); }
+        catch (NumberFormatException exception) { throw new IllegalArgumentException("Giá sách không hợp lệ."); }
+        return new Object[]{clean[0], nullable(clean[1]), nullable(clean[2]), nullable(clean[3]), year, quantity, price};
     }
 
     @Override

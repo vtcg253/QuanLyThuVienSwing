@@ -57,6 +57,7 @@ public final class RecordEditorPanel extends JPanel {
             JSpinner stock=new JSpinner(new SpinnerNumberModel(parse(value(initial,5)),0,Integer.MAX_VALUE,1));field(stock);
             fieldAt("Năm xuất bản",year,0,1);fieldAt("Số lượng tồn *",stock,1,1);
             values.add(year::getText);values.add(()->{try {stock.commitEdit();}catch(java.text.ParseException e){throw new IllegalArgumentException("Số lượng tồn không hợp lệ.");}return stock.getValue().toString();});row++;
+            JTextField price=input(value(initial,6));fieldAt("Giá sách (VNĐ) *",price,0,2);values.add(price::getText);row++;
         } else {
             String[] labels={"Họ và tên *","Ngày sinh","Số điện thoại","Địa chỉ"};
             for(int i=0;i<labels.length;i++) {

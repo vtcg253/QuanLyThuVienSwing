@@ -6,7 +6,7 @@ import java.time.LocalDate;
 
 public class VerifyDaoTransactions {
     static int commits,rollbacks;
-    static boolean missingStock, failReturn, duplicateUsername, readerHasOpenLoan;
+    static boolean missingStock, failReturn, duplicateUsername, readerHasOpenLoan, readerHasUnpaidPenalty, failPayment;
     static int quantity=3,lost=0;
     static final List<String> writes=new ArrayList<>();
     static Object proxy(Class<?> type,InvocationHandler handler){return Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},handler);}
@@ -15,6 +15,7 @@ public class VerifyDaoTransactions {
         switch(m.getName()){
             case "next":return ++cursor[0]<values.size();
             case "getInt":return ((Number)values.get(cursor[0])[(Integer)a[0]-1]).intValue();
+            case "getLong":return ((Number)values.get(cursor[0])[(Integer)a[0]-1]).longValue();
             case "getString":return String.valueOf(values.get(cursor[0])[(Integer)a[0]-1]);
             case "getObject":return values.get(cursor[0])[(Integer)a[0]-1];
         }return fallback(m.getReturnType());
@@ -22,8 +23,10 @@ public class VerifyDaoTransactions {
     static ResultSet query(String sql){
         if(sql.contains("WHERE p.MADG = ? AND c.TRANGTHAI = 'BORROWED'"))
             return rows(readerHasOpenLoan?Collections.singletonList(new Object[]{1}):List.of());
+        if(sql.contains("WHERE p.MADG = ? AND pp.TRANGTHAI = 'CHUA_THANH_TOAN'"))
+            return rows(readerHasUnpaidPenalty?Collections.singletonList(new Object[]{1}):List.of());
         if(sql.contains("SELECT SOLUONG FROM SACH"))return rows(missingStock?List.of():Collections.singletonList(new Object[]{10}));
-        if(sql.contains("SELECT SOLUONG, SOLUONGMAT"))return rows(Collections.singletonList(new Object[]{quantity,lost}));
+        if(sql.contains("SELECT ct.SOLUONG, ct.SOLUONGMAT"))return rows(Collections.singletonList(new Object[]{quantity,lost,25000L,0L}));
         if(sql.contains("FROM TAIKHOAN WHERE TENDANGNHAP"))return rows(duplicateUsername?Collections.singletonList(new Object[]{1}):List.of());
         if(sql.contains("FROM TAIKHOAN WHERE MANV"))return rows(List.of());
         return rows(Collections.singletonList(new Object[]{1}));
@@ -31,7 +34,7 @@ public class VerifyDaoTransactions {
     static Object statement(String sql,Class<?> type){return proxy(type,(o,m,a)->{
         switch(m.getName()){
             case "executeQuery":return query(sql==null?(String)a[0]:sql);
-            case "executeUpdate":writes.add(sql);return failReturn&&sql.contains("SET NGAYTRA")?0:1;
+            case "executeUpdate":writes.add(sql);return (failReturn&&sql.contains("SET NGAYTRA")) || (failPayment&&sql.contains("DA_THANH_TOAN"))?0:1;
         }return fallback(m.getReturnType());
     });}
     static Connection connection(){return (Connection)proxy(Connection.class,(o,m,a)->{
@@ -42,7 +45,7 @@ public class VerifyDaoTransactions {
             case "rollback":rollbacks++;return null;
         }return fallback(m.getReturnType());
     });}
-    static void reset(){commits=rollbacks=0;writes.clear();missingStock=failReturn=duplicateUsername=readerHasOpenLoan=false;quantity=3;lost=0;}
+    static void reset(){commits=rollbacks=0;writes.clear();missingStock=failReturn=duplicateUsername=readerHasOpenLoan=readerHasUnpaidPenalty=failPayment=false;quantity=3;lost=0;}
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     static void expectedFailure(RunnableSQL action)throws Exception{try{action.run();throw new AssertionError("Expected rejection");}catch(SQLException|IllegalArgumentException expected){}}
     interface RunnableSQL{void run()throws Exception;}
@@ -61,9 +64,9 @@ public class VerifyDaoTransactions {
         reset();missingStock=true;expectedFailure(()->loans.createLoan("DG01",today,today,Map.of("S01",2),"NV01"));
         check(commits==0&&rollbacks==1&&writes.size()==1,"Missing book must rollback inserted loan");
         reset();failReturn=true;expectedFailure(()->loans.returnBook("PM01","S01"));check(commits==0&&rollbacks==1,"Repeated return must rollback");
-        reset();loans.reportLost("PM01","S01",1);check(commits==1&&!writes.get(0).contains("'LOST'"),"Partial loss keeps borrowed status");
-        reset();loans.reportLost("PM01","S01",3);check(commits==1&&writes.get(0).contains("'LOST'"),"Full loss marks LOST");
-        reset();expectedFailure(()->loans.reportLost("PM01","S01",4));check(commits==0&&rollbacks==1&&writes.isEmpty(),"Excess loss rejected");
+        reset();loans.reportLost("PM01","S01",1,"NV01");check(commits==1&&writes.size()==2&&!writes.get(0).contains("'LOST'")&&writes.get(0).contains("TIENPHAT")&&writes.get(1).contains("INSERT INTO PHIEUPHAT"),"Partial loss keeps status and creates a penalty receipt");
+        reset();loans.reportLost("PM01","S01",3,"NV01");check(commits==1&&writes.size()==2&&writes.get(0).contains("'LOST'")&&writes.get(1).contains("INSERT INTO PHIEUPHAT"),"Full loss marks LOST and creates a penalty receipt");
+        reset();expectedFailure(()->loans.reportLost("PM01","S01",4,"NV01"));check(commits==0&&rollbacks==1&&writes.isEmpty(),"Excess loss rejected");
         EmployeeDAO employees=new EmployeeDAO();String[] person={"Nhân viên thử","2000-01-01","",""};
         reset();employees.saveWithAccount(null,person,"tester","123456","THU_THU",true);check(commits==1&&rollbacks==0&&writes.size()==2,"Employee and account must commit together");
         reset();expectedFailure(()->employees.saveWithAccount(null,person,"tester","123","THU_THU",true));check(commits==0&&rollbacks==1&&writes.size()==1,"Invalid account must rollback employee insert");
@@ -81,12 +84,19 @@ public class VerifyDaoTransactions {
         check(commits==0&&rollbacks==1&&writes.isEmpty(),"Reader with unreturned books must be rejected before inserting a loan");
         reset();loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",1),"NV01");
         check(commits==1&&writes.size()==2,"Reader with no borrowed lines can borrow again");
+        reset();readerHasUnpaidPenalty=true;
+        expectedFailure(()->loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",1),"NV01"));
+        check(commits==0&&rollbacks==1&&writes.isEmpty(),"Reader with unpaid penalty must be rejected before inserting a loan");
+        reset();loans.markPenaltyPaid("PP01");
+        check(commits==1&&writes.size()==1&&writes.get(0).contains("DA_THANH_TOAN"),"Payment marks the penalty paid");
+        reset();failPayment=true;expectedFailure(()->loans.markPenaltyPaid("PP01"));
+        check(commits==0&&rollbacks==1,"Already paid penalty cannot be paid again");
         reset();loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",3,"S02",2),"NV01");
         check(commits==1&&writes.size()==3,"Exactly five copies across multiple titles accepted");
         reset();expectedFailure(()->loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",3,"S02",3),"NV01"));
         check(writes.isEmpty()&&commits==0,"Six copies across titles rejected before writes");
         reset();expectedFailure(()->loans.createLoan("DG01",today,today.plusDays(14),Map.of("S01",6),"NV01"));
         check(writes.isEmpty(),"Six copies of one title rejected");
-        System.out.println("PASS: 18 transaction and business validation cases (simulated JDBC, no live database writes).");
+        System.out.println("PASS: 21 transaction and business validation cases (simulated JDBC, no live database writes).");
     }
 }

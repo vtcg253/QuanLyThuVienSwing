@@ -28,7 +28,8 @@ public final class RecordFormDialog {
         JDialog dialog = new JDialog(owner, title, java.awt.Dialog.ModalityType.APPLICATION_MODAL);
         JPanel card = LibraryStyle.card(new java.awt.BorderLayout(0, 22));
         card.add(LibraryStyle.label(title, 24, true, LibraryStyle.INK), java.awt.BorderLayout.NORTH);
-        style(content);
+        // Editable forms need default control styling. Read-only content owns its presentation.
+        if (editable) style(content);
         card.add(content, java.awt.BorderLayout.CENTER);
         JPanel buttons = LibraryStyle.clear(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 8, 0));
         javax.swing.JButton save = LibraryStyle.button(action, "Xóa".equals(action) ? LibraryStyle.RED : LibraryStyle.GREEN, java.awt.Color.WHITE);

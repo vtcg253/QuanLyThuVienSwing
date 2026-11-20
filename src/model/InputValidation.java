@@ -37,7 +37,7 @@ public final class InputValidation {
     }
 
     public static void record(RecordType type, String[] values) {
-        int count = type == RecordType.BOOKS ? 6 : 4;
+        int count = type == RecordType.BOOKS ? 7 : 4;
         if (values == null || values.length < count) throw new IllegalArgumentException("Dữ liệu biểu mẫu không hợp lệ.");
         text(values[0], type == RecordType.BOOKS ? "Tên sách" : "Họ tên", type == RecordType.BOOKS ? 200 : 100, true);
         if (type == RecordType.BOOKS) {
@@ -49,6 +49,9 @@ public final class InputValidation {
             }
             if (values[4] != null && !values[4].isBlank()) integer(values[4], "Năm xuất bản", 1, LocalDate.now().getYear());
             integer(values[5], "Tồn kho", 0, Integer.MAX_VALUE);
+            String price = text(values[6], "Giá sách", 15, true);
+            if (!price.matches("[0-9]+"))
+                throw new IllegalArgumentException("Giá sách phải là số nguyên không âm.");
         } else {
             String birth = text(values[1], "Ngày sinh", 10, false);
             if (!birth.isEmpty()) {

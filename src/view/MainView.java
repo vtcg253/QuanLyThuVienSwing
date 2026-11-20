@@ -34,6 +34,7 @@ public final class MainView extends JFrame {
         void createLoan();
         void returnBook(Object[] row);
         void reportLost(Object[] row);
+        void markPenaltyPaid(Object[] row);
         void logout();
     }
 
@@ -91,6 +92,7 @@ public final class MainView extends JFrame {
         JMenu loans = new JMenu("Mượn / Trả");
         addMenuItem(loans, "Danh sách phiếu mượn", () -> actions.navigate("loans"));
         addMenuItem(loans, "Lập phiếu mượn", () -> actions.createLoan());
+        addMenuItem(loans, "Phiếu phạt", () -> actions.navigate("penalties"));
         menuBar.add(loans);
 
         return menuBar;
@@ -164,6 +166,7 @@ public final class MainView extends JFrame {
         addNavigation(sidebar, "readers", "♙   Độc giả");
         if (user.isAdmin()) addNavigation(sidebar, "employees", "♟   Thủ thư & tài khoản");
         addNavigation(sidebar, "loans", "⇄   Mượn / Trả");
+        addNavigation(sidebar, "penalties", "₫   Phiếu phạt");
 
         JPanel top = new JPanel(new BorderLayout(16, 0));
         top.setBackground(GREEN);
@@ -203,6 +206,7 @@ public final class MainView extends JFrame {
         addPage("readers", "Quản lý độc giả", RecordType.READERS);
         addPage("employees", "Thủ thư & tài khoản", RecordType.EMPLOYEES);
         addPage("loans", "Quản lý mượn / trả", null);
+        addPage("penalties", "Phiếu phạt", null);
         addPage("genres", CatalogType.THE_LOAI);
         addPage("authors", CatalogType.TAC_GIA);
         addPage("publishers", CatalogType.NHA_XUAT_BAN);
@@ -269,9 +273,12 @@ public final class MainView extends JFrame {
         pages.get("loans").loansPanel.setStatistics(statistics);
     }
 
+    public void showLoan(String loanId) { pages.get("loans").loansPanel.showLoan(loanId); }
+
     public java.awt.Component loanActionParent() { return pages.get("loans").loansPanel.actionParent(); }
     public String loanSearch() { return pages.get("loans").loansPanel.searchText(); }
     public String loanStatus() { return pages.get("loans").loansPanel.selectedStatus(); }
+    public String penaltySearch() { return pages.get("penalties").penaltiesPanel.searchText(); }
     public void setLoanBusy(boolean busy) { pages.get("loans").loansPanel.setDetailsBusy(busy); }
     public void refreshLoanDetails(String loanId, TableData data) { pages.get("loans").loansPanel.refreshDetails(loanId,data); }
 
@@ -280,6 +287,7 @@ public final class MainView extends JFrame {
         private final JPanel panel = new JPanel(new BorderLayout());
         private BooksPanel recordsPanel;
         private LoansPanel loansPanel;
+        private PenaltiesPanel penaltiesPanel;
 
         private Page(String key, String title, RecordType recordType, CatalogType catalogType) {
             this.title = title;
@@ -287,6 +295,10 @@ public final class MainView extends JFrame {
             if ("loans".equals(key)) {
                 loansPanel = new LoansPanel(() -> actions);
                 panel.add(loansPanel);
+            } else if ("penalties".equals(key)) {
+                penaltiesPanel = new PenaltiesPanel(term -> actions.reload(key, term, "ALL"),
+                        row -> actions.markPenaltyPaid(row));
+                panel.add(penaltiesPanel);
             } else {
                 recordsPanel = new BooksPanel(key, term -> actions.reload(key, term, "ALL"),
                         () -> actions.add(key), row -> actions.edit(key, row),
@@ -297,6 +309,7 @@ public final class MainView extends JFrame {
 
         private void setData(TableData data) {
             if (loansPanel != null) loansPanel.setData(data);
+            else if (penaltiesPanel != null) penaltiesPanel.setData(data);
             else {
                 recordsPanel.setData(data);
                 panel.revalidate();

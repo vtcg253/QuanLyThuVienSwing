@@ -128,6 +128,11 @@ public final class AppController {
             }
 
             @Override
+            public void markPenaltyPaid(Object[] row) {
+                AppController.this.markPenaltyPaid(row);
+            }
+
+            @Override
             public void logout() {
                 currentUser = null;
                 loginFrame = new DangNhapView();
@@ -153,6 +158,7 @@ public final class AppController {
                         yield employees.listRecords(search);
                     }
                     case "loans" -> loans.listLoans(search, status);
+                    case "penalties" -> loans.listPenalties(search);
                     case "genres" -> catalogs.listCatalog(CatalogType.THE_LOAI, search);
                     case "authors" -> catalogs.listCatalog(CatalogType.TAC_GIA, search);
                     case "publishers" -> catalogs.listCatalog(CatalogType.NHA_XUAT_BAN, search);
@@ -265,7 +271,7 @@ public final class AppController {
                 try {
                     EditorData data = get();
                     String[] stored = data.stored();
-                    String[] fields = stored == null ? null : java.util.Arrays.copyOf(stored, type == RecordType.BOOKS ? 6 : 4);
+                    String[] fields = stored == null ? null : java.util.Arrays.copyOf(stored, type == RecordType.BOOKS ? 7 : 4);
                     String[] account = stored == null || type != RecordType.EMPLOYEES ? null : new String[]{stored[4],
                             stored[5] == null || stored[5].isBlank() ? "THU_THU" : stored[5], stored[6]};
                     EditorPopup popup = id == null && type == RecordType.READERS
@@ -310,7 +316,7 @@ public final class AppController {
     }
 
     private void saveRecordFromEditor(RecordType type, String id, String[] values, String page, RecordEditorPanel editor, EditorPopup popup) {
-        int length = type == RecordType.BOOKS ? 6 : 4;
+        int length = type == RecordType.BOOKS ? 7 : 4;
         new SwingWorker<Void, Void>() {
             @Override protected Void doInBackground() throws Exception {
                 String[] fields = java.util.Arrays.copyOf(values, length);
@@ -370,9 +376,9 @@ public final class AppController {
                             }
                             @Override protected void done() {
                                 try {
-                                    get();
+                                    String loanId = get();
                                     RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã lập phiếu mượn thành công."));
-                                    reload("loans", "", "ALL");
+                                    mainFrame.showLoan(loanId);
                                 }
                                 catch (Exception exception) { editor[0].showError("Không thể lập phiếu: " + rootMessage(exception)); }
                             }
@@ -392,21 +398,42 @@ public final class AppController {
     }
 
     private void reportLost(Object[] row) {
-        String loanId = row[0].toString();
-        String bookId = row[6].toString();
-        int alreadyLost = Integer.parseInt(row[8].toString());
-        int borrowed = Integer.parseInt(row[7].toString());
-        JTextField quantity = new JTextField(Integer.toString(Math.max(1, borrowed - alreadyLost)));
-        if (!RecordFormDialog.confirm(mainFrame.loanActionParent(), "Số lượng báo mất (còn mượn: " + (borrowed - alreadyLost) + ")", quantity)) return;
         try {
+            String loanId = row[0].toString();
+            String bookId = row[6].toString();
+            int alreadyLost = Integer.parseInt(row[8].toString());
+            int borrowed = Integer.parseInt(row[7].toString());
+            if (row.length <= 20 || !(row[20] instanceof Number price)) {
+                showError("Không đọc được giá sách. Hãy tải lại danh sách phiếu.");
+                return;
+            }
+            long unitPrice = price.longValue();
+            if (unitPrice <= 0) {
+                showError("Giá sách đang bằng 0. Hãy cập nhật giá trong mục Danh sách sách trước khi lập phiếu phạt.");
+                return;
+            }
+            JTextField quantity = new JTextField(Integer.toString(Math.max(1, borrowed - alreadyLost)));
+            javax.swing.JPanel form = new javax.swing.JPanel(new java.awt.GridLayout(0, 1, 0, 8));
+            form.add(new JLabel("Số lượng báo mất (còn mượn: " + (borrowed - alreadyLost) + ")"));
+            form.add(quantity);
+            form.add(new JLabel("Giá phạt mỗi cuốn: " + money(unitPrice)));
+            if (!RecordFormDialog.confirm(mainFrame.loanActionParent(), "Lập phiếu phạt", form, "Lập phiếu phạt")) return;
             int value = Integer.parseInt(quantity.getText().trim());
             if (value < 1 || value > borrowed - alreadyLost) {
                 showError("Số lượng báo mất phải từ 1 đến " + (borrowed - alreadyLost) + ".");
                 return;
             }
-            runLoanAction(() -> loans.reportLost(loanId, bookId, value), loanId);
+            long amount = Math.multiplyExact(unitPrice, value);
+            String receipt = "Phiếu phạt mất sách · " + loanId + "\nSách: " + row[5]
+                    + "\nSố lượng: " + value + "\nĐơn giá: " + money(unitPrice)
+                    + "\nTổng tiền: " + money(amount);
+            runLoanAction(() -> loans.reportLost(loanId, bookId, value, currentUser.employeeId()), loanId, receipt);
         } catch (NumberFormatException exception) {
             showError("Số lượng mất phải là số nguyên.");
+        } catch (ArithmeticException exception) {
+            showError("Số tiền phạt vượt giới hạn.");
+        } catch (RuntimeException exception) {
+            showError("Không thể mở phiếu phạt: " + rootMessage(exception));
         }
     }
 
@@ -414,9 +441,45 @@ public final class AppController {
         return RecordFormDialog.confirm(mainFrame.loanActionParent(), "Xác nhận trả sách", new JLabel(message), "Xác nhận");
     }
 
+    private void markPenaltyPaid(Object[] row) {
+        String penaltyId = row[0].toString();
+        if (!"CHUA_THANH_TOAN".equals(row[10])) {
+            showError("Phiếu phạt này đã được thanh toán.");
+            return;
+        }
+        if (!RecordFormDialog.confirm(mainFrame, "Xác nhận thanh toán",
+                new JLabel("Xác nhận đã thu tiền cho phiếu phạt " + penaltyId + "?"), "Đã thu tiền")) {
+            return;
+        }
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() throws Exception {
+                loans.markPenaltyPaid(penaltyId);
+                return null;
+            }
+
+            @Override protected void done() {
+                try {
+                    get();
+                    RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã xác nhận thanh toán phiếu phạt."));
+                    reload("penalties", mainFrame.penaltySearch(), "ALL");
+                } catch (Exception exception) {
+                    showError("Không thể xác nhận thanh toán: " + rootMessage(exception));
+                }
+            }
+        }.execute();
+    }
+
+    private String money(long amount) {
+        return java.text.NumberFormat.getIntegerInstance(java.util.Locale.forLanguageTag("vi-VN")).format(amount) + " VNĐ";
+    }
+
     private record LoanRefresh(TableData list, TableData details, Map<String, Long> statistics) { }
 
     private void runLoanAction(SqlAction action, String loanId) {
+        runLoanAction(action, loanId, null);
+    }
+
+    private void runLoanAction(SqlAction action, String loanId, String receipt) {
         String search = mainFrame.loanSearch();
         String status = mainFrame.loanStatus();
         mainFrame.setLoanBusy(true);
@@ -435,6 +498,7 @@ public final class AppController {
                         mainFrame.display("loans",refreshed.list());
                         mainFrame.displayLoanStatistics(refreshed.statistics());
                         mainFrame.refreshLoanDetails(loanId,refreshed.details());
+                        if (receipt != null) RecordFormDialog.showContent(mainFrame, "Phiếu phạt", new JLabel("<html>" + receipt.replace("\n", "<br>") + "</html>"));
                     }
                 } catch (Exception exception) {
                     showError((saved ? "Đã ghi nhận thao tác nhưng chưa tải lại được dữ liệu. Hãy đóng và mở lại phiếu: "

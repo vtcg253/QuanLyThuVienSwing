@@ -21,7 +21,7 @@ public final class LoanDAO {
                 SELECT pm.MAPM, dg.HOTEN, nv.HOTEN, pm.NGAYMUON, pm.NGAYHANTRA,
                        s.TENSACH, ct.MASACH, ct.SOLUONG, ct.SOLUONGMAT, ct.NGAYTRA,
                        ct.TRANGTHAI, pm.MADG, pm.MANV,
-                       dg.NGAYSINH, dg.SDT, dg.DIACHI, nv.NGAYSINH, nv.SDT, nv.DIACHI
+                       dg.NGAYSINH, dg.SDT, dg.DIACHI, nv.NGAYSINH, nv.SDT, nv.DIACHI, ct.TIENPHAT, s.GIABAN
                 FROM PHIEUMUON pm
                 JOIN DOCGIA dg ON dg.MADG = pm.MADG
                 JOIN NHANVIEN nv ON nv.MANV = pm.MANV
@@ -44,8 +44,29 @@ public final class LoanDAO {
         return query(sql, new String[]{"Mã phiếu", "Độc giả", "Nhân viên lập", "Ngày mượn",
                         "Hạn trả", "Sách", "Mã sách", "Số lượng", "Số lượng mất", "Ngày trả",
                         "Trạng thái", "Mã độc giả", "Mã nhân viên", "Ngày sinh độc giả", "SĐT độc giả",
-                        "Địa chỉ độc giả", "Ngày sinh nhân viên", "SĐT nhân viên", "Địa chỉ nhân viên"},
+                        "Địa chỉ độc giả", "Ngày sinh nhân viên", "SĐT nhân viên", "Địa chỉ nhân viên",
+                        "Tiền phạt (VNĐ)", "Giá sách (VNĐ)"},
                 term, term, term, term, status, status, status, status);
+    }
+
+    public TableData listPenalties(String search) throws SQLException {
+        String term = like(search);
+        return query("""
+                SELECT pp.MAPP, pp.NGAYLAPPHAT, pm.MAPM, dg.HOTEN, nv.HOTEN,
+                       s.MASACH, s.TENSACH, pp.SOLUONGMAT, pp.DONGIAPHAT,
+                       pp.TONGTIEN, pp.TRANGTHAI, pp.NGAYTHANHTOAN
+                FROM PHIEUPHAT pp
+                JOIN PHIEUMUON pm ON pm.MAPM = pp.MAPM
+                JOIN DOCGIA dg ON dg.MADG = pm.MADG
+                JOIN NHANVIEN nv ON nv.MANV = pp.MANV
+                JOIN SACH s ON s.MASACH = pp.MASACH
+                WHERE UPPER(pp.MAPP) LIKE ? OR UPPER(pm.MAPM) LIKE ?
+                   OR UPPER(dg.HOTEN) LIKE ? OR UPPER(s.MASACH) LIKE ?
+                   OR UPPER(s.TENSACH) LIKE ?
+                ORDER BY pp.NGAYLAPPHAT DESC, pp.MAPP DESC
+                """, new String[]{"Mã phạt", "Ngày lập", "Phiếu mượn", "Độc giả", "Nhân viên xử lý",
+                        "Mã sách", "Tên sách", "Số lượng mất", "Đơn giá (VNĐ)", "Thành tiền (VNĐ)",
+                        "Trạng thái", "Ngày thanh toán"}, term, term, term, term, term);
     }
 
     public String createLoan(String readerId, LocalDate borrowDate, LocalDate dueDate,
@@ -81,6 +102,13 @@ public final class LoanDAO {
                         WHERE p.MADG = ? AND c.TRANGTHAI = 'BORROWED'
                         """, readerId)) {
                     throw new SQLException("Độc giả còn sách chưa trả. Vui lòng trả hết sách trước khi mượn tiếp.");
+                }
+                if (exists(connection, """
+                        SELECT 1 FROM PHIEUPHAT pp
+                        JOIN PHIEUMUON p ON p.MAPM = pp.MAPM
+                        WHERE p.MADG = ? AND pp.TRANGTHAI = 'CHUA_THANH_TOAN'
+                        """, readerId)) {
+                    throw new SQLException("Độc giả còn phiếu phạt chưa thanh toán. Vui lòng hoàn tất thanh toán trước khi mượn tiếp.");
                 }
                 if (!exists(connection, "SELECT 1 FROM NHANVIEN WHERE MANV = ?", employeeId)) {
                     throw new SQLException("Tài khoản chưa được liên kết với hồ sơ nhân viên.");
@@ -157,20 +185,28 @@ public final class LoanDAO {
         }
     }
 
-    public void reportLost(String loanId, String bookId, int quantityLost) throws SQLException {
+    public void reportLost(String loanId, String bookId, int quantityLost, String employeeId) throws SQLException {
         loanId = model.InputValidation.code(loanId, "Mã phiếu mượn");
         bookId = model.InputValidation.code(bookId, "Mã sách");
+        employeeId = model.InputValidation.code(employeeId, "Mã nhân viên");
         if (quantityLost <= 0) {
             throw new IllegalArgumentException("Số lượng mất phải lớn hơn 0.");
         }
         try (Connection connection = DBConnection.getConnection()) {
             connection.setAutoCommit(false);
             try {
+                if (!exists(connection, "SELECT 1 FROM NHANVIEN WHERE MANV = ?", employeeId)) {
+                    throw new SQLException("Không tìm thấy nhân viên xử lý phiếu phạt.");
+                }
                 int borrowed;
                 int lost;
+                long price;
+                long fine;
                 try (PreparedStatement statement = connection.prepareStatement("""
-                        SELECT SOLUONG, SOLUONGMAT FROM CT_PHIEUMUON
-                        WHERE MAPM = ? AND MASACH = ? AND TRANGTHAI = 'BORROWED' FOR UPDATE
+                        SELECT ct.SOLUONG, ct.SOLUONGMAT, s.GIABAN, ct.TIENPHAT
+                        FROM CT_PHIEUMUON ct JOIN SACH s ON s.MASACH = ct.MASACH
+                        WHERE ct.MAPM = ? AND ct.MASACH = ? AND ct.TRANGTHAI = 'BORROWED'
+                        FOR UPDATE OF ct.SOLUONGMAT
                         """)) {
                     statement.setString(1, loanId);
                     statement.setString(2, bookId);
@@ -180,21 +216,55 @@ public final class LoanDAO {
                         }
                         borrowed = result.getInt(1);
                         lost = result.getInt(2);
+                        price = result.getLong(3);
+                        fine = result.getLong(4);
                     }
                 }
                 if (quantityLost > borrowed - lost) {
                     throw new SQLException("Số lượng báo mất vượt quá số sách còn đang mượn.");
                 }
+                long newFine = Math.addExact(fine, Math.multiplyExact(price, quantityLost));
                 int newLost = lost + quantityLost;
                 if (newLost == borrowed) {
                     execute(connection, """
-                                    UPDATE CT_PHIEUMUON SET SOLUONGMAT = ?, TRANGTHAI = 'LOST'
+                                    UPDATE CT_PHIEUMUON SET SOLUONGMAT = ?, TIENPHAT = ?, TRANGTHAI = 'LOST'
                                     WHERE MAPM = ? AND MASACH = ?
                                     """,
-                            new Object[]{newLost, loanId, bookId});
+                            new Object[]{newLost, newFine, loanId, bookId});
                 } else {
-                    execute(connection, "UPDATE CT_PHIEUMUON SET SOLUONGMAT = ? WHERE MAPM = ? AND MASACH = ?",
-                            new Object[]{newLost, loanId, bookId});
+                    execute(connection, "UPDATE CT_PHIEUMUON SET SOLUONGMAT = ?, TIENPHAT = ? WHERE MAPM = ? AND MASACH = ?",
+                            new Object[]{newLost, newFine, loanId, bookId});
+                }
+                String penaltyId = nextCode(connection, "PHIEUPHAT", "MAPP", "PP");
+                execute(connection, """
+                                INSERT INTO PHIEUPHAT
+                                    (MAPP, MAPM, MASACH, MANV, NGAYLAPPHAT, SOLUONGMAT, DONGIAPHAT, TONGTIEN, TRANGTHAI)
+                                VALUES (?, ?, ?, ?, TRUNC(SYSDATE), ?, ?, ?, 'CHUA_THANH_TOAN')
+                                """,
+                        new Object[]{penaltyId, loanId, bookId, employeeId, quantityLost, price,
+                                Math.multiplyExact(price, quantityLost)});
+                connection.commit();
+            } catch (SQLException | RuntimeException exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
+    }
+
+    public void markPenaltyPaid(String penaltyId) throws SQLException {
+        penaltyId = model.InputValidation.code(penaltyId, "Mã phiếu phạt");
+        try (Connection connection = DBConnection.getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE PHIEUPHAT
+                        SET TRANGTHAI = 'DA_THANH_TOAN', NGAYTHANHTOAN = TRUNC(SYSDATE)
+                        WHERE MAPP = ? AND TRANGTHAI = 'CHUA_THANH_TOAN'
+                        """)) {
+                    statement.setString(1, penaltyId);
+                    if (statement.executeUpdate() != 1) {
+                        throw new SQLException("Phiếu phạt không tồn tại hoặc đã được thanh toán.");
+                    }
                 }
                 connection.commit();
             } catch (SQLException | RuntimeException exception) {

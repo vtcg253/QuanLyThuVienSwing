@@ -72,6 +72,10 @@ Thông tin kết nối tương ứng Oracle SQL Developer: hostname `localhost`,
 - Tìm kiếm danh sách, thêm/sửa/xóa và kiểm tra ràng buộc lịch sử.
 - Lập phiếu với nhiều sách, kiểm tra tồn kho; trả sách và báo mất.
 - Cập nhật tồn kho bằng trigger Oracle trong transaction mượn/trả.
+- Báo mất sách lập một phiếu phạt riêng, lưu đơn giá tại thời điểm ghi nhận, nhân viên xử lý và trạng thái thanh toán.
+- Mục **Phiếu phạt** cho phép tra cứu, xem chi tiết và xác nhận đã thu tiền. Độc giả còn phiếu phạt chưa thanh toán không thể mượn thêm.
+
+File SQL chính khai báo giá sách, tiền phạt và bảng `PHIEUPHAT` ngay trong `CREATE TABLE`. Dùng file này khi tạo schema mới. Với schema đã tồn tại, chạy [sql/penalty-migration.sql](sql/penalty-migration.sql) bằng **F5** trong SQL Developer trước khi dùng chức năng phạt. Giá sách mặc định là 0; cập nhật giá trong biểu mẫu để tính phạt chính xác.
 
 ## Giao diện
 

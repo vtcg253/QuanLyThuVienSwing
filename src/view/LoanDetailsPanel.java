@@ -3,7 +3,6 @@ package view;
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellEditor;
 import java.util.function.Consumer;
 import java.awt.*;
 import java.time.LocalDate;
@@ -56,7 +55,7 @@ final class LoanDetailsPanel extends JPanel {
         top.add(info, BorderLayout.CENTER);
 
         long borrowed = 0, returned = 0, lost = 0, remaining = 0;
-        Object[][] values = new Object[rows.size()][9];
+        Object[][] values = new Object[rows.size()][10];
         for (int i = 0; i < rows.size(); i++) {
             Object[] row = rows.get(i);
             int quantity = number(row[7]), missing = number(row[8]);
@@ -66,7 +65,7 @@ final class LoanDetailsPanel extends JPanel {
             int pendingCount = isBorrowed ? Math.max(0, quantity - missing) : 0;
             borrowed += quantity; returned += returnedCount; lost += missing; remaining += pendingCount;
             values[i] = new Object[]{row[6], row[5], quantity, returnedCount, missing, pendingCount,
-                    dateText(row[9]), status(row), null};
+                    dateText(row[9]), status(row), money(value(row,19)), null};
         }
         JPanel totals = clear(new GridLayout(1, 4, 12, 0));
         totals.add(total("Cuốn đã mượn", borrowed, INK));
@@ -79,9 +78,9 @@ final class LoanDetailsPanel extends JPanel {
         JPanel books = clear(new BorderLayout(0, 12));
         books.add(label("Sách trong phiếu · " + rows.size() + " đầu sách", 17, true, INK), BorderLayout.NORTH);
         table = new JTable(new DefaultTableModel(values, new String[]{"Mã sách", "Tên sách", "SL mượn",
-                "Đã trả", "Đã mất", "Còn mượn", "Ngày trả", "Trạng thái", "Thao tác"}) {
+                "Đã trả", "Đã mất", "Còn mượn", "Ngày trả", "Trạng thái", "Tiền phạt", "Thao tác"}) {
             @Override public boolean isCellEditable(int row, int column) {
-                return !busy && column == 8 && actionable(records.get(row));
+                return false;
             }
             @Override public Class<?> getColumnClass(int column) {
                 return column >= 2 && column <= 5 ? Integer.class : Object.class;
@@ -121,18 +120,29 @@ final class LoanDetailsPanel extends JPanel {
             }
         };
         table.setDefaultRenderer(Object.class,renderer);table.setDefaultRenderer(Integer.class,renderer);
-        int[] widths = {75, 230, 75, 65, 65, 85, 110, 115, 290};
+        int[] widths = {75, 230, 75, 65, 65, 85, 110, 115, 130, 290};
         for (int i = 0; i < widths.length; i++) {
             table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
             table.getColumnModel().getColumn(i).setMinWidth(i == 1 ? 180 : widths[i]);
         }
-        ((javax.swing.table.TableRowSorter<?>) table.getRowSorter()).setSortable(8, false);
-        table.getColumnModel().getColumn(8).setCellRenderer((t,value,selected,focus,row,col) -> {
+        ((javax.swing.table.TableRowSorter<?>) table.getRowSorter()).setSortable(9, false);
+        table.getColumnModel().getColumn(9).setCellRenderer((t,value,selected,focus,row,col) -> {
             JPanel controls = controls(records.get(t.convertRowIndexToModel(row)), null, null);
             controls.setSize(t.getColumnModel().getColumn(col).getWidth(),t.getRowHeight());
             controls.doLayout();return controls;
         });
-        table.getColumnModel().getColumn(8).setCellEditor(new ActionEditor());
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent event) {
+                int row = table.rowAtPoint(event.getPoint());
+                int column = table.columnAtPoint(event.getPoint());
+                if (busy || row < 0 || column != 9) return;
+                Object[] record = records.get(table.convertRowIndexToModel(row)).clone();
+                if (!actionable(record)) return;
+                int x = event.getX() - table.getCellRect(row, column, true).x;
+                if (x < table.getColumnModel().getColumn(column).getWidth() / 2) returnBook.accept(record);
+                else reportLost.accept(record);
+            }
+        });
         table.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createEmptyBorder());
@@ -170,16 +180,6 @@ final class LoanDetailsPanel extends JPanel {
         return panel;
     }
 
-    private final class ActionEditor extends AbstractCellEditor implements TableCellEditor {
-        @Override public Object getCellEditorValue() { return null; }
-        @Override public Component getTableCellEditorComponent(JTable t, Object value, boolean selected, int row, int column) {
-            Object[] record = records.get(t.convertRowIndexToModel(row)).clone();
-            return controls(record,
-                    () -> { fireEditingStopped();returnBook.accept(record); },
-                    () -> { fireEditingStopped();reportLost.accept(record); });
-        }
-    }
-
     private static JPanel info(String name, String value) {
         JPanel group = clear(new BorderLayout(0, 6));
         group.add(label(name, 12, false, MUTED), BorderLayout.NORTH);
@@ -215,4 +215,8 @@ final class LoanDetailsPanel extends JPanel {
         catch (RuntimeException exception) { return null; }
     }
     private static String dateText(Object value) { LocalDate date = date(value);return date == null ? "—" : date.toString(); }
+    private static String money(Object value) {
+        return java.text.NumberFormat.getIntegerInstance(java.util.Locale.forLanguageTag("vi-VN"))
+                .format(value == null ? 0 : ((Number)value).longValue()) + " VNĐ";
+    }
 }

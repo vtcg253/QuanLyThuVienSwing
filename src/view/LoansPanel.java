@@ -19,6 +19,7 @@ final class LoansPanel extends JPanel {
     private final PaginationBar pagination=new PaginationBar(this::applyPage);
     private List<List<Object[]>> grouped=List.of();
     private JScrollPane listScroll;
+    private boolean updatingFilter;
     private final Map<String,JLabel> totals=new LinkedHashMap<>();
     private final java.util.function.Supplier<MainView.Actions> actions;
     LoansPanel(java.util.function.Supplier<MainView.Actions> actions) {
@@ -42,7 +43,7 @@ final class LoansPanel extends JPanel {
         filter.add(search,BorderLayout.CENTER);JPanel controls=clear(new FlowLayout(FlowLayout.RIGHT,8,0));field(status);controls.add(status);
         JButton find=button("Lọc phiếu",GREEN,Color.WHITE);controls.add(find);filter.add(controls,BorderLayout.EAST);top.add(filter,BorderLayout.SOUTH);
         Runnable reload=()->actions.get().reload("loans",search.getText(),switch(status.getSelectedIndex()){case 1->"BORROWED";case 2->"OVERDUE";case 3->"RETURNED";case 4->"LOST";default->"ALL";});
-        find.addActionListener(event->reload.run());search.addActionListener(event->reload.run());status.addActionListener(event->reload.run());
+        find.addActionListener(event->{if(!updatingFilter)reload.run();});search.addActionListener(event->{if(!updatingFilter)reload.run();});status.addActionListener(event->{if(!updatingFilter)reload.run();});
         card.add(top,BorderLayout.NORTH);
         JPanel results=clear(new BorderLayout(0,12));JPanel heading=clear(new GridLayout(0,1,0,5));heading.add(label("Danh sách phiếu",17,true,INK));heading.add(count);results.add(heading,BorderLayout.NORTH);
         JPanel wrap=clear(new BorderLayout());wrap.add(list,BorderLayout.NORTH);listScroll=scroll(wrap);results.add(listScroll);card.add(results);card.add(pagination,BorderLayout.SOUTH);
@@ -103,6 +104,13 @@ final class LoansPanel extends JPanel {
         }
     }
     String searchText() { return search.getText(); }
+    void showLoan(String loanId) {
+        updatingFilter = true;
+        search.setText(loanId);
+        status.setSelectedIndex(0);
+        updatingFilter = false;
+        actions.get().reload("loans", loanId, "ALL");
+    }
     String selectedStatus() {
         return switch(status.getSelectedIndex()) {
             case 1 -> "BORROWED";case 2 -> "OVERDUE";case 3 -> "RETURNED";case 4 -> "LOST";default -> "ALL";
