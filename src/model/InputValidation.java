@@ -37,19 +37,20 @@ public final class InputValidation {
     }
 
     public static void record(RecordType type, String[] values) {
-        int count = type == RecordType.BOOKS ? 7 : 4;
+        int count = type == RecordType.BOOKS ? 8 : 4;
         if (values == null || values.length < count) throw new IllegalArgumentException("Dữ liệu biểu mẫu không hợp lệ.");
         text(values[0], type == RecordType.BOOKS ? "Tên sách" : "Họ tên", type == RecordType.BOOKS ? 200 : 100, true);
         if (type == RecordType.BOOKS) {
+            if (values[1] != null && !values[1].isBlank()) integer(values[1], "Số tập", 1, 99999);
             String[] labels = {"thể loại", "tác giả", "nhà xuất bản"};
-            for (int i = 1; i <= 3; i++) {
+            for (int i = 2; i <= 4; i++) {
                 if (values[i] == null || values[i].isBlank())
-                    throw new IllegalArgumentException("Vui lòng chọn " + labels[i - 1] + ".");
-                code(values[i], "Mã " + labels[i - 1]);
+                    throw new IllegalArgumentException("Vui lòng chọn " + labels[i - 2] + ".");
+                code(values[i], "Mã " + labels[i - 2]);
             }
-            if (values[4] != null && !values[4].isBlank()) integer(values[4], "Năm xuất bản", 1, LocalDate.now().getYear());
-            integer(values[5], "Tồn kho", 0, Integer.MAX_VALUE);
-            String price = text(values[6], "Giá sách", 15, true);
+            if (values[5] != null && !values[5].isBlank()) integer(values[5], "Năm xuất bản", 1, LocalDate.now().getYear());
+            integer(values[6], "Tồn kho", 0, Integer.MAX_VALUE);
+            String price = text(values[7], "Giá sách", 15, true);
             if (!price.matches("[0-9]+"))
                 throw new IllegalArgumentException("Giá sách phải là số nguyên không âm.");
         } else {

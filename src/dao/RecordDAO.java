@@ -61,7 +61,7 @@ public abstract class RecordDAO {
             String[] keys = {"MATL", "MATG", "MANXB"};
             String[] labels = {"Thể loại", "Tác giả", "Nhà xuất bản"};
             for (int i = 0; i < tables.length; i++) {
-                String value = values[i + 1];
+                String value = values[i + 2];
                 if (!value.isBlank() && !exists(connection,
                         "SELECT 1 FROM " + tables[i] + " WHERE " + keys[i] + " = ?", value))
                     throw new SQLException(labels[i] + " không còn tồn tại. Vui lòng chọn lại.");

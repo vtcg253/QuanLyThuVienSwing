@@ -19,7 +19,9 @@ public final class LoanDAO {
     public TableData listLoans(String search, String status) throws SQLException {
         String sql = """
                 SELECT pm.MAPM, dg.HOTEN, nv.HOTEN, pm.NGAYMUON, pm.NGAYHANTRA,
-                       s.TENSACH, ct.MASACH, ct.SOLUONG, ct.SOLUONGMAT, ct.NGAYTRA,
+                       CASE WHEN s.SO_TAP IS NULL THEN s.TENSACH
+                            ELSE s.TENSACH || N' · Tập ' || TO_CHAR(s.SO_TAP) END,
+                       ct.MASACH, ct.SOLUONG, ct.SOLUONGMAT, ct.NGAYTRA,
                        ct.TRANGTHAI, pm.MADG, pm.MANV,
                        dg.NGAYSINH, dg.SDT, dg.DIACHI, nv.NGAYSINH, nv.SDT, nv.DIACHI, ct.TIENPHAT, s.GIABAN
                 FROM PHIEUMUON pm
@@ -32,28 +34,32 @@ public final class LoanDAO {
                     JOIN SACH matched_book ON matched_book.MASACH = matched.MASACH
                     WHERE matched.MAPM = pm.MAPM
                       AND (UPPER(pm.MAPM) LIKE ? OR UPPER(dg.HOTEN) LIKE ?
-                           OR UPPER(matched_book.TENSACH) LIKE ? OR UPPER(nv.HOTEN) LIKE ?)
+                           OR UPPER(matched_book.TENSACH) LIKE ? OR UPPER(nv.HOTEN) LIKE ?
+                           OR TO_CHAR(matched_book.SO_TAP) LIKE ?)
                       AND (? = 'ALL' OR matched.TRANGTHAI = ?
                            OR (? = 'OVERDUE' AND matched.TRANGTHAI = 'BORROWED'
                                AND pm.NGAYHANTRA < TRUNC(SYSDATE))
                            OR (? = 'LOST' AND matched.SOLUONGMAT > 0))
                 )
-                ORDER BY pm.NGAYMUON DESC, pm.MAPM, s.TENSACH
+                ORDER BY pm.NGAYMUON DESC, pm.MAPM, s.TENSACH, s.SO_TAP
                 """;
         String term = like(search);
         return query(sql, new String[]{"Mã phiếu", "Độc giả", "Nhân viên lập", "Ngày mượn",
                         "Hạn trả", "Sách", "Mã sách", "Số lượng", "Số lượng mất", "Ngày trả",
                         "Trạng thái", "Mã độc giả", "Mã nhân viên", "Ngày sinh độc giả", "SĐT độc giả",
                         "Địa chỉ độc giả", "Ngày sinh nhân viên", "SĐT nhân viên", "Địa chỉ nhân viên",
-                        "Tiền phạt (VNĐ)", "Giá sách (VNĐ)"},
-                term, term, term, term, status, status, status, status);
+                "Tiền phạt (VNĐ)", "Giá sách (VNĐ)"},
+                term, term, term, term, term, status, status, status, status);
     }
 
     public TableData listPenalties(String search) throws SQLException {
         String term = like(search);
         return query("""
                 SELECT pp.MAPP, pp.NGAYLAPPHAT, pm.MAPM, dg.HOTEN, nv.HOTEN,
-                       s.MASACH, s.TENSACH, pp.SOLUONGMAT, pp.DONGIAPHAT,
+                       s.MASACH,
+                       CASE WHEN s.SO_TAP IS NULL THEN s.TENSACH
+                            ELSE s.TENSACH || N' · Tập ' || TO_CHAR(s.SO_TAP) END,
+                       pp.SOLUONGMAT, pp.DONGIAPHAT,
                        pp.TONGTIEN, pp.TRANGTHAI, pp.NGAYTHANHTOAN
                 FROM PHIEUPHAT pp
                 JOIN PHIEUMUON pm ON pm.MAPM = pp.MAPM
@@ -62,11 +68,11 @@ public final class LoanDAO {
                 JOIN SACH s ON s.MASACH = pp.MASACH
                 WHERE UPPER(pp.MAPP) LIKE ? OR UPPER(pm.MAPM) LIKE ?
                    OR UPPER(dg.HOTEN) LIKE ? OR UPPER(s.MASACH) LIKE ?
-                   OR UPPER(s.TENSACH) LIKE ?
+                   OR UPPER(s.TENSACH) LIKE ? OR TO_CHAR(s.SO_TAP) LIKE ?
                 ORDER BY pp.NGAYLAPPHAT DESC, pp.MAPP DESC
                 """, new String[]{"Mã phạt", "Ngày lập", "Phiếu mượn", "Độc giả", "Nhân viên xử lý",
                         "Mã sách", "Tên sách", "Số lượng mất", "Đơn giá (VNĐ)", "Thành tiền (VNĐ)",
-                        "Trạng thái", "Ngày thanh toán"}, term, term, term, term, term);
+                        "Trạng thái", "Ngày thanh toán"}, term, term, term, term, term, term);
     }
 
     public String createLoan(String readerId, LocalDate borrowDate, LocalDate dueDate,

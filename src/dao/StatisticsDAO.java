@@ -39,9 +39,12 @@ public final class StatisticsDAO {
 
     public TableData dashboardBooks() throws SQLException {
         return query("""
-                SELECT s.MASACH, s.TENSACH, s.SOLUONG, COALESCE(SUM(c.SOLUONG), 0)
+                SELECT s.MASACH,
+                       CASE WHEN s.SO_TAP IS NULL THEN s.TENSACH
+                            ELSE s.TENSACH || N' · Tập ' || TO_CHAR(s.SO_TAP) END,
+                       s.SOLUONG, COALESCE(SUM(c.SOLUONG), 0)
                 FROM SACH s LEFT JOIN CT_PHIEUMUON c ON c.MASACH = s.MASACH
-                GROUP BY s.MASACH, s.TENSACH, s.SOLUONG
+                GROUP BY s.MASACH, s.TENSACH, s.SO_TAP, s.SOLUONG
                 ORDER BY s.SOLUONG DESC, s.MASACH
                 """, new String[]{"Mã sách", "Tên sách", "Tồn kho", "Đã mượn"});
     }

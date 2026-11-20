@@ -38,14 +38,14 @@ src/
 
 - JDK 17 trở lên
 - Maven 3.8 trở lên
-- Oracle Database có các bảng `THELOAI`, `TACGIA`, `NHAXUATBAN`, `DOCGIA`, `NHANVIEN`, `TAIKHOAN`, `SACH`, `PHIEUMUON`, `CT_PHIEUMUON`
+- Oracle Database đã được tạo schema ứng dụng, gồm các bảng `THELOAI`, `TACGIA`, `NHAXUATBAN`, `DOCGIA`, `NHANVIEN`, `TAIKHOAN`, `SACH`, `PHIEUMUON`, `CT_PHIEUMUON` và `PHIEUPHAT`
 - Tài khoản Oracle có quyền đọc/ghi các bảng trên
 
 ## Chuẩn bị Oracle
 
-Chạy file SQL tổng hợp [Quan Ly Thu Vien.sql](../../oracle/Quan%20Ly%20Thu%20Vien.sql) bằng Oracle SQL Developer. File này tạo các bảng cần thiết và bổ sung `SOLUONGMAT`, `TRANGTHAI` cùng các ràng buộc trong `CT_PHIEUMUON`.
+Schema Oracle được quản lý ngoài repository này. Trước khi chạy ứng dụng, bảo đảm bảng `SACH` có các cột `SO_TAP` và `GIABAN`, bảng `CT_PHIEUMUON` có `SOLUONGMAT`, `TIENPHAT` và `TRANGTHAI`, và bảng `PHIEUPHAT` đã được tạo.
 
-Trigger trong SQL tự cập nhật tồn kho khi mượn/trả; DAO khóa và kiểm tra tồn kho rồi để trigger cập nhật đúng một lần. Không thêm một lớp cập nhật tồn kho khác. Script có dữ liệu mẫu, vì vậy không chạy lại trên schema đã có các mã mẫu.
+Trigger Oracle tự cập nhật tồn kho khi mượn/trả; DAO khóa và kiểm tra tồn kho rồi để trigger cập nhật đúng một lần. Không thêm một lớp cập nhật tồn kho khác.
 
 ## Cấu hình và chạy
 
@@ -69,13 +69,14 @@ Thông tin kết nối tương ứng Oracle SQL Developer: hostname `localhost`,
 
 - Đăng nhập bằng `TAIKHOAN` và BCrypt, phân quyền màn hình nhân viên cho `ADMIN`.
 - Quản lý sách, độc giả, tác giả, thể loại, nhà xuất bản và hồ sơ/tài khoản nhân viên.
+- Quản lý số tập trên từng đầu sách; mỗi tập có mã, tồn kho và lịch sử mượn/trả riêng.
 - Tìm kiếm danh sách, thêm/sửa/xóa và kiểm tra ràng buộc lịch sử.
 - Lập phiếu với nhiều sách, kiểm tra tồn kho; trả sách và báo mất.
 - Cập nhật tồn kho bằng trigger Oracle trong transaction mượn/trả.
 - Báo mất sách lập một phiếu phạt riêng, lưu đơn giá tại thời điểm ghi nhận, nhân viên xử lý và trạng thái thanh toán.
 - Mục **Phiếu phạt** cho phép tra cứu, xem chi tiết và xác nhận đã thu tiền. Độc giả còn phiếu phạt chưa thanh toán không thể mượn thêm.
 
-File SQL chính khai báo giá sách, tiền phạt và bảng `PHIEUPHAT` ngay trong `CREATE TABLE`. Dùng file này khi tạo schema mới. Với schema đã tồn tại, chạy [sql/penalty-migration.sql](sql/penalty-migration.sql) bằng **F5** trong SQL Developer trước khi dùng chức năng phạt. Giá sách mặc định là 0; cập nhật giá trong biểu mẫu để tính phạt chính xác.
+Trường `SO_TAP` để trống với sách lẻ; các tập trong một bộ được lưu thành từng mã sách riêng. Giá sách được lưu trong `GIABAN` và dùng để tính tiền phạt khi ghi nhận mất sách.
 
 ## Giao diện
 
@@ -88,21 +89,6 @@ File SQL chính khai báo giá sách, tiền phạt và bảng `PHIEUPHAT` ngay 
 Các danh sách có phân trang mặc định 10 dòng (hoặc 10 phiếu mượn) mỗi trang, có thể chọn 5/10/20 và chuyển trang bằng số trang hoặc nút Trước/Sau.
 
 Ngày sinh của độc giả và thủ thư nhập dạng `dd/MM/yyyy` có sẵn dấu `/`, chỉ cần điền số. Biểu mẫu kiểm tra ngày hợp lệ trước khi lưu; có thể để trống ngày sinh.
-
-## Dữ liệu demo bổ sung
-
-File [sql/demo-data.sql](sql/demo-data.sql) thêm dữ liệu vào schema đã có, dùng mã chuẩn `TL`, `TG`, `NXB`, `DG`, `NV`, `S`, `PM`:
-
-- 6 thể loại, 16 tác giả, 4 nhà xuất bản.
-- 30 sách, 16 độc giả có ngày sinh, số điện thoại và địa chỉ minh họa.
-- 2 thủ thư và 2 tài khoản `thuthu_lan`, `thuthu_minh`, mật khẩu `123456`, quyền `THU_THU`.
-- 30 phiếu / 60 dòng sách, gồm đang mượn, quá hạn, đã trả, mất toàn bộ, mất một phần và phiếu đã trả một số sách.
-
-Chạy file bằng **Run Script (F5)** trong Oracle SQL Developer, trên kết nối/schema ứng dụng. Hai trigger mượn/trả phải đang bật và hợp lệ. Script dùng chúng để cập nhật tồn kho, không cập nhật kho thêm lần nữa.
-
-Các mã đã tồn tại sẽ được bỏ qua khi chạy lại; không xóa dữ liệu đang có. Mã mẫu đã được đối chiếu với schema hiện tại: sách S08–S37, thể loại TL09–TL14, tác giả TG16–TG31, NXB05–NXB08, độc giả DG05–DG20, nhân viên NV03–NV04, phiếu PM09–PM38. Khi nạp vào schema khác, cần kiểm tra mã để tránh bỏ qua nhầm bản ghi. Bảng đổi mã cũ/mới nằm tại `bao-cao/bang-doi-ma-demo.csv`; tiện ích `tools/NormalizeDemoCodes.java` chuyển mã cũ trong một transaction và kiểm tra dữ liệu trước khi commit. Script cũng bỏ hậu tố `(Demo)` trong tên thuộc bộ mẫu đã nạp trước đây và đổi hai tên đăng nhập mẫu cũ thành `thuthu_lan`, `thuthu_minh`. Các ngày mượn/hạn trả được tính theo ngày Oracle tại lần tạo đầu tiên, không tự dịch sang ngày mới khi chạy lại. Đây là thông tin minh họa để thử giao diện, phân trang và nghiệp vụ; tên, số điện thoại, địa chỉ và thông tin xuất bản không dùng làm dữ liệu thực.
-
-Trong bộ mẫu có 14 phiếu quá hạn (4 phiếu ban đầu và 10 phiếu bổ sung, trễ hạn 1–10 ngày tại lúc tạo).
 
 ## Kiểm tra transaction DAO sau khi tách lớp
 

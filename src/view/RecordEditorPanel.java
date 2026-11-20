@@ -32,7 +32,9 @@ public final class RecordEditorPanel extends JPanel {
         intro.add(label(id == null ? "Mã được tạo tự động khi lưu. Điền thông tin bên dưới để hoàn tất." : "Cập nhật thông tin và lưu các thay đổi.", 14, false, MUTED), BorderLayout.SOUTH);
         card.add(intro, BorderLayout.NORTH);
         if (type == RecordType.BOOKS) {
-            JTextField name = input(value(initial,0)); fieldAt("Tên sách *", name,0,3);values.add(name::getText);row++;
+            JTextField name = input(value(initial,0)); fieldAt("Tên sách *", name,0,2);values.add(name::getText);
+            JTextField volume = input(value(initial,1));
+            fieldAt("Số tập (nếu có)", volume,2,1);values.add(volume::getText);row++;
             CatalogType[] types={CatalogType.THE_LOAI,CatalogType.TAC_GIA,CatalogType.NHA_XUAT_BAN};
             for(int i=0;i<3;i++) {
                 CatalogType catalog=types[i];
@@ -40,7 +42,7 @@ public final class RecordEditorPanel extends JPanel {
                 choices.addItem(new Choice("", "Chọn " + catalog.title().toLowerCase(Locale.ROOT)));
                 TableData data=catalogs.get(catalog);
                 if(data!=null)for(Object[] entry:data.rows())choices.addItem(new Choice(entry[0].toString(),entry[1].toString()));
-                String selected=value(initial,i+1);
+                String selected=value(initial,i+2);
                 for(int j=0;j<choices.getItemCount();j++)if(choices.getItemAt(j).id().equals(selected))choices.setSelectedIndex(j);
                 choices.setEditable(false);field(choices);
                 JPanel group=clear(new BorderLayout(8,0));group.add(choices,BorderLayout.CENTER);
@@ -53,11 +55,12 @@ public final class RecordEditorPanel extends JPanel {
                 });
             }
             row++;
-            JTextField year=input(value(initial,4));
-            JSpinner stock=new JSpinner(new SpinnerNumberModel(parse(value(initial,5)),0,Integer.MAX_VALUE,1));field(stock);
-            fieldAt("Năm xuất bản",year,0,1);fieldAt("Số lượng tồn *",stock,1,1);
-            values.add(year::getText);values.add(()->{try {stock.commitEdit();}catch(java.text.ParseException e){throw new IllegalArgumentException("Số lượng tồn không hợp lệ.");}return stock.getValue().toString();});row++;
-            JTextField price=input(value(initial,6));fieldAt("Giá sách (VNĐ) *",price,0,2);values.add(price::getText);row++;
+            JTextField year=input(value(initial,5));
+            JSpinner stock=new JSpinner(new SpinnerNumberModel(parse(value(initial,6)),0,Integer.MAX_VALUE,1));field(stock);
+            JTextField price=input(value(initial,7));
+            fieldAt("Năm xuất bản",year,0,1);fieldAt("Số lượng tồn *",stock,1,1);fieldAt("Giá sách (VNĐ) *",price,2,1);
+            values.add(year::getText);values.add(()->{try {stock.commitEdit();}catch(java.text.ParseException e){throw new IllegalArgumentException("Số lượng tồn không hợp lệ.");}return stock.getValue().toString();});
+            values.add(price::getText);row++;
         } else {
             String[] labels={"Họ và tên *","Ngày sinh","Số điện thoại","Địa chỉ"};
             for(int i=0;i<labels.length;i++) {

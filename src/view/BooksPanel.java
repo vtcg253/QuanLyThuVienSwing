@@ -13,14 +13,22 @@ final class BooksPanel extends JPanel {
     private static final Color MUTED = new Color(112, 123, 116);
     private static final Color LINE = new Color(232, 224, 209);
     private static final Color GREEN = new Color(32, 112, 84);
+    private static final Color BEIGE = new Color(236, 230, 216);
     private final JTable table = new JTable();
     private final PaginationBar pagination = new PaginationBar(this::applyPage);
     private final Consumer<Object[]> edit;
     private final Consumer<Object[]> delete;
+    private final Consumer<String> addVolume;
     private int dataColumns;
     private final boolean bookMode;
     private final String page;
     private java.util.List<Object[]> sourceRows = java.util.List.of();
+    private TableData currentData = new TableData(new String[0], java.util.List.of());
+    private String selectedSeries;
+    private JLabel pageHeading;
+    private JLabel pageDescription;
+    private JButton addButton;
+    private JButton backButton;
 
     BooksPanel(Consumer<String> searchAction, Runnable addAction,
                Consumer<Object[]> edit, Consumer<Object[]> delete) {
@@ -29,11 +37,17 @@ final class BooksPanel extends JPanel {
 
     BooksPanel(String page, Consumer<String> searchAction, Runnable addAction,
                Consumer<Object[]> edit, Consumer<Object[]> delete) {
+        this(page, searchAction, addAction, edit, delete, ignored -> {});
+    }
+
+    BooksPanel(String page, Consumer<String> searchAction, Runnable addAction,
+               Consumer<Object[]> edit, Consumer<Object[]> delete, Consumer<String> addVolume) {
         super(new BorderLayout(0, 18));
         this.page = page;
         this.bookMode = "books".equals(page);
         this.edit = edit;
         this.delete = delete;
+        this.addVolume = addVolume;
         setOpaque(false);
         setBorder(BorderFactory.createEmptyBorder(26, 26, 24, 26));
         JPanel heading = new JPanel(new BorderLayout(0, 18));
@@ -54,16 +68,19 @@ final class BooksPanel extends JPanel {
             case "authors" -> "Quản lý thông tin tác giả và các đầu sách trong thư viện.";
             case "genres" -> "Phân loại sách để tra cứu và quản lý dễ dàng hơn.";
             case "publishers" -> "Quản lý thông tin liên hệ các nhà xuất bản.";
-            default -> "Tìm và quản lý sách theo mã, tên sách, thể loại, tác giả hoặc nhà xuất bản.";
+            default -> "Tìm và quản lý sách theo mã, tên sách, tập, thể loại, tác giả hoặc nhà xuất bản.";
         };
-        intro.add(text(title, 27, true, INK), BorderLayout.NORTH);
-        intro.add(text(description,
-                15, false, MUTED), BorderLayout.CENTER);
+        pageHeading = text(bookMode ? "Bộ sách" : title, 27, true, INK);
+        pageDescription = text(bookMode
+                ? "Chọn một tên sách để xem và quản lý các tập thuộc bộ đó."
+                : description, 15, false, MUTED);
+        intro.add(pageHeading, BorderLayout.NORTH);
+        intro.add(pageDescription, BorderLayout.CENTER);
         heading.add(intro, BorderLayout.NORTH);
         JPanel toolbar = new JPanel(new BorderLayout(12, 0));
         toolbar.setOpaque(false);
         JTextField search = new JTextField();
-        search.setToolTipText(bookMode ? "Tìm theo mã, tên sách, thể loại, tác giả hoặc nhà xuất bản" : "Tìm theo mã hoặc tên");
+        search.setToolTipText(bookMode ? "Tìm theo mã, tên sách, tập, thể loại, tác giả hoặc nhà xuất bản" : "Tìm theo mã hoặc tên");
         search.getAccessibleContext().setAccessibleName("Tìm kiếm");
         search.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
         LibraryStyle.field(search);
@@ -72,17 +89,23 @@ final class BooksPanel extends JPanel {
             @Override public void focusLost(java.awt.event.FocusEvent e) { search.repaint(); }
         });
         JButton find = new RoundedButton("Tìm kiếm", GREEN, Color.WHITE);
-        JButton add = new RoundedButton(switch (page) {
+        addButton = new RoundedButton(switch (page) {
             case "readers" -> "+ Thêm độc giả"; case "employees" -> "+ Thêm thủ thư";
             case "authors" -> "+ Thêm tác giả"; case "genres" -> "+ Thêm thể loại";
             case "publishers" -> "+ Thêm nhà xuất bản"; default -> "+ Thêm sách";
         }, GREEN, Color.WHITE);
         find.addActionListener(event -> searchAction.accept(search.getText()));
         search.addActionListener(event -> searchAction.accept(search.getText()));
-        add.addActionListener(event -> addAction.run());
+        addButton.addActionListener(event -> {
+            if (bookMode && selectedSeries != null) addVolume.accept(selectedSeries);
+            else addAction.run();
+        });
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         controls.setOpaque(false);
-        controls.add(find); controls.add(add);
+        backButton = new RoundedButton("← Bộ sách", BEIGE, INK);
+        backButton.setVisible(false);
+        backButton.addActionListener(event -> showSeriesIndex());
+        controls.add(backButton); controls.add(find); controls.add(addButton);
         toolbar.add(search, BorderLayout.CENTER);
         toolbar.add(controls, BorderLayout.EAST);
         heading.add(toolbar, BorderLayout.SOUTH);
@@ -108,6 +131,14 @@ final class BooksPanel extends JPanel {
             label.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LINE),
                     BorderFactory.createEmptyBorder(0, 8, 0, 8)));
             return label;
+        });
+        if (bookMode) table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override public void mouseClicked(java.awt.event.MouseEvent event) {
+                if (selectedSeries != null || event.getClickCount() != 1) return;
+                int viewRow = table.rowAtPoint(event.getPoint());
+                if (viewRow >= 0)
+                    openSeries(String.valueOf(table.getValueAt(viewRow, 0)));
+            }
         });
         table.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override public Component getTableCellRendererComponent(JTable t, Object value, boolean selected,
@@ -135,6 +166,12 @@ final class BooksPanel extends JPanel {
 
     void setData(TableData data) {
         if (table.isEditing()) table.getCellEditor().cancelCellEditing();
+        if (bookMode) {
+            currentData = data;
+            if (selectedSeries == null) renderSeriesIndex();
+            else renderSeriesVolumes();
+            return;
+        }
         // Detach the previous page filter before replacing the result set.
         table.setRowSorter(null);
         sourceRows = data.rows();
@@ -145,7 +182,6 @@ final class BooksPanel extends JPanel {
         headers[dataColumns] = bookMode ? "" : "Thao tác";
         if (!bookMode) headers[0] = "Mã";
         // Short headings leave space for the title and author columns.
-        if (bookMode) { headers[4] = "NXB"; headers[5] = "Năm XB"; }
         Object[][] rows = new Object[data.rows().size()][dataColumns + 1];
         for (int i = 0; i < rows.length; i++) {
             Object[] source = data.rows().get(i);
@@ -159,9 +195,9 @@ final class BooksPanel extends JPanel {
         });
         table.setAutoCreateRowSorter(true);
         ((TableRowSorter<?>) table.getRowSorter()).setSortable(dataColumns, false);
-        int[] widths = {75, 260, 160, 145, 145, 80, 80, 142};
+        int[] widths = {75, 260, 75, 145, 145, 145, 80, 80, 120};
         for (int i = 0; i < dataColumns; i++) table.getColumnModel().getColumn(i).setPreferredWidth(
-                bookMode ? widths[i] : i == 0 ? 90 : i == 1 ? 240 : 170);
+                i == 0 ? 90 : i == 1 ? 240 : 170);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
         TableColumn actions = table.getColumnModel().getColumn(dataColumns);
         actions.setMinWidth(142); actions.setMaxWidth(142);
@@ -172,7 +208,147 @@ final class BooksPanel extends JPanel {
             return buttons;
         });
         actions.setCellEditor(new ActionEditor());
-        if (bookMode) table.getColumnModel().getColumn(6).setCellRenderer((t, value, selected, focus, row, col) -> {
+        listenForSort();
+        pagination.setTotal(rows.length);
+        applyPage();
+    }
+
+    private void renderSeriesIndex() {
+        pageHeading.setText("Bộ sách & sách lẻ");
+        pageDescription.setText("Chọn một tên sách để xem các tập trong bộ đó.");
+        backButton.setVisible(false);
+        backButton.setText("← Bộ sách");
+        addButton.setText("+ Thêm sách");
+        addButton.setVisible(true);
+        sourceRows = java.util.List.of();
+
+        java.util.Map<String, java.util.List<Object[]>> groups = new java.util.LinkedHashMap<>();
+        for (Object[] row : currentData.rows())
+            groups.computeIfAbsent(String.valueOf(row[1]), ignored -> new java.util.ArrayList<>()).add(row);
+
+        Object[][] rows = new Object[groups.size()][4];
+        int index = 0;
+        for (var entry : groups.entrySet()) {
+            long volumeCount = entry.getValue().stream().filter(row -> row[2] != null).count();
+            String count = volumeCount > 0 ? volumeCount + " tập"
+                    : entry.getValue().size() == 1 ? "Sách lẻ" : entry.getValue().size() + " đầu sách";
+            long stock = entry.getValue().stream().mapToLong(row -> row[7] instanceof Number n ? n.longValue() : 0).sum();
+            rows[index++] = new Object[]{entry.getKey(), count, stock, null};
+        }
+
+        installModel(rows, new String[]{"Tên bộ / tên sách", "Số tập", "Tổng tồn kho", "Thao tác"}, -1);
+        int[] widths = {330, 150, 170, 150};
+        for (int column = 0; column < widths.length; column++)
+            table.getColumnModel().getColumn(column).setPreferredWidth(widths[column]);
+        TableColumn action = table.getColumnModel().getColumn(3);
+        action.setMinWidth(150); action.setMaxWidth(150);
+        action.setCellRenderer((t, value, selected, focus, row, col) ->
+                seriesActionPanel(openLabel(t.getValueAt(row, 1))));
+        pagination.setTotal(rows.length);
+        applyPage();
+    }
+
+    private void renderSeriesVolumes() {
+        boolean standalone = currentData.rows().stream()
+                .filter(row -> String.valueOf(row[1]).equals(selectedSeries)).count() == 1
+                && currentData.rows().stream().anyMatch(row -> String.valueOf(row[1]).equals(selectedSeries)
+                        && row[2] == null);
+        pageHeading.setText(standalone ? "Chi tiết sách: " + selectedSeries : currentSeriesHeading());
+        pageDescription.setText(standalone
+                ? "Thông tin và số lượng tồn của sách lẻ này."
+                : "Quản lý từng tập, số lượng tồn và thông tin xuất bản của bộ sách này.");
+        backButton.setVisible(true);
+        backButton.setText("← Danh sách sách");
+        addButton.setText("+ Thêm tập");
+        addButton.setVisible(!standalone);
+        sourceRows = currentData.rows().stream()
+                .filter(row -> String.valueOf(row[1]).equals(selectedSeries)).toList();
+        dataColumns = currentData.columns().length;
+        String[] headers = java.util.Arrays.copyOf(currentData.columns(), dataColumns + 1);
+        headers[dataColumns] = "Thao tác";
+        headers[0] = "Mã";
+        headers[2] = "Tập";
+        headers[5] = "NXB";
+        headers[6] = "Năm XB";
+        Object[][] rows = new Object[sourceRows.size()][dataColumns + 1];
+        for (int i = 0; i < rows.length; i++)
+            System.arraycopy(sourceRows.get(i), 0, rows[i], 0, dataColumns);
+
+        installModel(rows, headers, dataColumns);
+        table.getColumnModel().getColumn(2).setCellRenderer((t, value, selected, focus, row, col) -> {
+            Object text = value == null ? "—" : "Tập " + value;
+            return t.getDefaultRenderer(Object.class).getTableCellRendererComponent(
+                    t, text, selected, focus, row, col);
+        });
+        int[] widths = {75, 260, 75, 145, 145, 145, 80, 80, 120};
+        for (int column = 0; column < dataColumns; column++)
+            table.getColumnModel().getColumn(column).setPreferredWidth(widths[column]);
+        TableColumn actions = table.getColumnModel().getColumn(dataColumns);
+        actions.setMinWidth(142); actions.setMaxWidth(142);
+        actions.setCellRenderer((t, value, selected, focus, row, col) -> {
+            JPanel buttons = actionButtons(null, null);
+            buttons.setSize(t.getColumnModel().getColumn(col).getWidth(), t.getRowHeight());
+            buttons.doLayout();
+            return buttons;
+        });
+        actions.setCellEditor(new ActionEditor());
+        table.getColumnModel().getColumn(7).setCellRenderer(stockRenderer());
+        pagination.setTotal(rows.length);
+        applyPage();
+    }
+
+    private void installModel(Object[][] rows, String[] headers, int editableColumn) {
+        table.setRowSorter(null);
+        table.setModel(new DefaultTableModel(rows, headers) {
+            @Override public boolean isCellEditable(int row, int column) { return column == editableColumn; }
+        });
+        table.setAutoCreateRowSorter(true);
+        if (editableColumn >= 0) ((TableRowSorter<?>) table.getRowSorter()).setSortable(editableColumn, false);
+        table.setAutoResizeMode(JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
+        listenForSort();
+    }
+
+    private void listenForSort() {
+        table.getRowSorter().addRowSorterListener(event -> {
+            if (event.getType() == javax.swing.event.RowSorterEvent.Type.SORT_ORDER_CHANGED)
+                pagination.firstPage();
+        });
+    }
+
+    private void showSeriesIndex() {
+        if (table.isEditing()) table.getCellEditor().cancelCellEditing();
+        selectedSeries = null;
+        renderSeriesIndex();
+    }
+
+    private void openSeries(String title) {
+        if (table.isEditing()) table.getCellEditor().cancelCellEditing();
+        selectedSeries = title;
+        renderSeriesVolumes();
+    }
+
+    void resetSeriesView() {
+        if (!bookMode || selectedSeries == null) return;
+        selectedSeries = null;
+        renderSeriesIndex();
+    }
+
+    private String currentSeriesHeading() { return "Bộ sách: " + selectedSeries; }
+
+    private static String openLabel(Object count) {
+        return "Sách lẻ".equals(String.valueOf(count)) ? "Mở sách →" : "Xem tập →";
+    }
+
+    private JPanel seriesActionPanel(String caption) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 7, 11));
+        panel.setBackground(PAPER);
+        JButton open = new RoundedButton(caption, BEIGE, INK);
+        panel.add(open);
+        return panel;
+    }
+
+    private TableCellRenderer stockRenderer() {
+        return (t, value, selected, focus, row, col) -> {
             JPanel cell = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 15));
             cell.setBackground(selected ? table.getSelectionBackground() : PAPER);
             JLabel badge = new JLabel(value == null ? "0" : value.toString()) {
@@ -189,13 +365,7 @@ final class BooksPanel extends JPanel {
             cell.setSize(t.getColumnModel().getColumn(col).getWidth(), t.getRowHeight());
             cell.doLayout();
             return cell;
-        });
-        table.getRowSorter().addRowSorterListener(event -> {
-            if (event.getType() == javax.swing.event.RowSorterEvent.Type.SORT_ORDER_CHANGED)
-                pagination.firstPage();
-        });
-        pagination.setTotal(rows.length);
-        applyPage();
+        };
     }
 
     private void applyPage() {

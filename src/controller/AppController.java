@@ -88,6 +88,7 @@ public final class AppController {
                 if ("dashboard".equals(page)) {
                     loadDashboard();
                 } else {
+                    if ("books".equals(page)) mainFrame.resetBookSeries();
                     reload(page, "", "ALL");
                 }
             }
@@ -100,6 +101,11 @@ public final class AppController {
             @Override
             public void add(String page) {
                 addRecord(page);
+            }
+
+            @Override
+            public void addBookVolume(String seriesTitle) {
+                AppController.this.addBookVolume(seriesTitle);
             }
 
             @Override
@@ -208,6 +214,44 @@ public final class AppController {
         openRecordEditor(page, null);
     }
 
+    private void addBookVolume(String seriesTitle) {
+        new SwingWorker<String[], Void>() {
+            @Override protected String[] doInBackground() throws Exception {
+                TableData series = books.listRecords(seriesTitle);
+                Object[] template = null;
+                int highestVolume = 0;
+                for (Object[] row : series.rows()) {
+                    if (!seriesTitle.equals(String.valueOf(row[1]))) continue;
+                    int volume = volumeNumber(row[2]);
+                    if (template == null || volume > highestVolume) {
+                        template = row;
+                        highestVolume = volume;
+                    }
+                }
+                if (template == null) throw new IllegalStateException("Không tìm thấy sách trong bộ này.");
+
+                String[] previous = books.recordFormValues(String.valueOf(template[0]));
+                return new String[]{seriesTitle, Integer.toString(highestVolume + 1), previous[2], previous[3],
+                        previous[4], previous[5], "0", previous[7]};
+            }
+
+            @Override protected void done() {
+                try {
+                    openRecordEditor("books", null, get());
+                } catch (Exception exception) {
+                    showError("Không thể lấy thông tin bộ sách: " + rootMessage(exception));
+                }
+            }
+        }.execute();
+    }
+
+    private static int volumeNumber(Object value) {
+        if (value instanceof Number number) return number.intValue();
+        if (value == null) return 0;
+        try { return Integer.parseInt(value.toString().trim()); }
+        catch (NumberFormatException ignored) { return 0; }
+    }
+
     private void editRecord(String page, Object[] row) {
         CatalogType catalog = catalogType(page);
         if (catalog != null) {
@@ -258,6 +302,10 @@ public final class AppController {
     private record EditorData(String[] stored, Map<CatalogType, TableData> catalogs) { }
 
     private void openRecordEditor(String page, String id) {
+        openRecordEditor(page, id, null);
+    }
+
+    private void openRecordEditor(String page, String id, String[] initialValues) {
         RecordType type = recordType(page);
         if (type == RecordType.EMPLOYEES) requireAdmin();
         new SwingWorker<EditorData, Void>() {
@@ -271,7 +319,8 @@ public final class AppController {
                 try {
                     EditorData data = get();
                     String[] stored = data.stored();
-                    String[] fields = stored == null ? null : java.util.Arrays.copyOf(stored, type == RecordType.BOOKS ? 7 : 4);
+                    String[] fields = initialValues != null ? initialValues.clone()
+                            : stored == null ? null : java.util.Arrays.copyOf(stored, type == RecordType.BOOKS ? 8 : 4);
                     String[] account = stored == null || type != RecordType.EMPLOYEES ? null : new String[]{stored[4],
                             stored[5] == null || stored[5].isBlank() ? "THU_THU" : stored[5], stored[6]};
                     EditorPopup popup = id == null && type == RecordType.READERS
@@ -316,7 +365,7 @@ public final class AppController {
     }
 
     private void saveRecordFromEditor(RecordType type, String id, String[] values, String page, RecordEditorPanel editor, EditorPopup popup) {
-        int length = type == RecordType.BOOKS ? 7 : 4;
+        int length = type == RecordType.BOOKS ? 8 : 4;
         new SwingWorker<Void, Void>() {
             @Override protected Void doInBackground() throws Exception {
                 String[] fields = java.util.Arrays.copyOf(values, length);

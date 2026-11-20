@@ -87,8 +87,8 @@ public final class LoanEditorPanel extends JPanel {
                 }
                 if (requested.isEmpty()) throw new IllegalArgumentException("Thêm ít nhất một sách để lập phiếu.");
                 for (Object[] row : books.rows())
-                    if (requested.getOrDefault(row[0].toString(), 0) > ((Number) row[6]).intValue())
-                        throw new IllegalArgumentException("Số lượng mượn vượt tồn kho của sách: " + row[1]);
+                    if (requested.getOrDefault(row[0].toString(), 0) > ((Number) row[7]).intValue())
+                        throw new IllegalArgumentException("Số lượng mượn vượt tồn kho của sách: " + bookTitle(row));
                 message.setText(" ");
                 onSave.accept(new Request(selected.id(), start, end, requested));
             } catch (java.time.format.DateTimeParseException ex) {
@@ -138,11 +138,11 @@ public final class LoanEditorPanel extends JPanel {
                 int stock = 5;
                 for (Object[] row : books.rows()) {
                     String bookId = row[0].toString();
-                    int available = ((Number) row[6]).intValue();
+                    int available = ((Number) row[7]).intValue();
                     if (bookId.equals(id)) stock = available;
                     if ((available > 0 && !selectedIds.contains(bookId)) || bookId.equals(id)) {
                         RecordEditorPanel.Choice choice = new RecordEditorPanel.Choice(bookId,
-                                row[1] + " · " + bookId + " · Tồn " + row[6]);
+                                bookTitle(row) + " · " + bookId + " · Tồn " + row[7]);
                         choices.addElement(choice);
                         if (bookId.equals(id)) choices.setSelectedItem(choice);
                     }
@@ -155,12 +155,16 @@ public final class LoanEditorPanel extends JPanel {
                 model.setMaximum(maximum);
             }
             boolean unused = books.rows().stream().anyMatch(row ->
-                    ((Number) row[6]).intValue() > 0 && !selectedIds.contains(row[0].toString()));
+                    ((Number) row[7]).intValue() > 0 && !selectedIds.contains(row[0].toString()));
             add.setEnabled(!busy && totalQuantity() < 5 && unused);
             add.setToolTipText(totalQuantity() >= 5 ? "Đã đủ giới hạn 5 cuốn sách." : "Thêm đầu sách khác vào phiếu.");
         } finally {
             refreshing = false;
         }
+    }
+
+    private static String bookTitle(Object[] row) {
+        return row[1] + (row[2] == null ? "" : " · Tập " + row[2]);
     }
 
     private void rebuild() {

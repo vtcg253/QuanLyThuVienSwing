@@ -29,6 +29,7 @@ public final class MainView extends JFrame {
         void navigate(String page);
         void reload(String page, String search, String status);
         void add(String page);
+        void addBookVolume(String seriesTitle);
         void edit(String page, Object[] row);
         void delete(String page, Object[] row);
         void createLoan();
@@ -118,6 +119,11 @@ public final class MainView extends JFrame {
         cards.show(content, key);
         title.setText(page.title);
         selectNavigation(key);
+    }
+
+    public void resetBookSeries() {
+        Page page = pages.get("books");
+        if (page != null && page.recordsPanel != null) page.recordsPanel.resetSeriesView();
     }
 
     public void displayDashboard(Map<String, Long> statistics, TableData books) {
@@ -302,7 +308,8 @@ public final class MainView extends JFrame {
             } else {
                 recordsPanel = new BooksPanel(key, term -> actions.reload(key, term, "ALL"),
                         () -> actions.add(key), row -> actions.edit(key, row),
-                        user.isAdmin() ? row -> actions.delete(key, row) : null);
+                        user.isAdmin() ? row -> actions.delete(key, row) : null,
+                        seriesTitle -> actions.addBookVolume(seriesTitle));
                 panel.add(recordsPanel, BorderLayout.CENTER);
             }
         }
