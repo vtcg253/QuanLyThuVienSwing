@@ -31,7 +31,12 @@ public class VerifyInputValidation {
         rejected(() -> InputValidation.record(RecordType.BOOKS, new String[]{"Sách", "TL01", "", "NXB01", "2020", "1"}));
         rejected(() -> InputValidation.record(RecordType.BOOKS, new String[]{"Sách", "TL01", "TG01", null, "2020", "1"}));
         rejected(() -> InputValidation.catalog(CatalogType.THE_LOAI, new String[]{"A".repeat(101)}));
-        rejected(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", "", "123"}));
+        rejected(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", "Hà Nội", "123"}));
+        rejected(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", " ", "0241234567"}));
+        rejected(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", "Hà Nội", " "}));
+        rejected(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", "A".repeat(201), "0241234567"}));
+        rejected(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", "Hà Nội", "abc1234567"}));
+        accepted(() -> InputValidation.catalog(CatalogType.NHA_XUAT_BAN, new String[]{"NXB", "Hà Nội", "0241234567"}));
         accepted(() -> InputValidation.catalog(CatalogType.TAC_GIA, new String[]{"Tên tác giả", null}));
         accepted(() -> InputValidation.account("tester", "123456", "THU_THU", true));
         accepted(() -> InputValidation.account("tester", "", "ADMIN", false));

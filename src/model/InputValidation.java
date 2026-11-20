@@ -67,8 +67,11 @@ public final class InputValidation {
         if (type == null || values == null || values.length != type.formColumns().length)
             throw new IllegalArgumentException("Dữ liệu danh mục không hợp lệ.");
         text(values[0], type.formLabels()[0], 100, true);
-        if (values.length > 1) text(values[1], "Địa chỉ", 200, false);
-        if (type == CatalogType.NHA_XUAT_BAN) phone(values[2]);
+        if (values.length > 1) text(values[1], "Địa chỉ", 200, type == CatalogType.NHA_XUAT_BAN);
+        if (type == CatalogType.NHA_XUAT_BAN) {
+            text(values[2], "Số điện thoại", 15, true);
+            phone(values[2]);
+        }
     }
 
     public static void account(String username, String password, String role, boolean newAccount) {
