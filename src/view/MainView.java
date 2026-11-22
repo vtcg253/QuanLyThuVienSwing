@@ -1,9 +1,9 @@
 package view;
 
-import model.CatalogType;
-import model.LibraryUser;
-import model.RecordType;
-import model.TableData;
+import model.LoaiDanhMuc;
+import model.NguoiDungThuVien;
+import model.LoaiHoSo;
+import model.DuLieuBang;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -49,10 +49,10 @@ public final class MainView extends JFrame {
     private final Map<String, Page> pages = new LinkedHashMap<>();
     private final JLabel title = new JLabel("Tổng quan");
     private final JLabel userLabel = new JLabel();
-    private final LibraryUser user;
+    private final NguoiDungThuVien user;
     private Actions actions;
 
-    public MainView(LibraryUser user) {
+    public MainView(NguoiDungThuVien user) {
         super("Quản lý thư viện");
         this.user = user;
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -110,7 +110,7 @@ public final class MainView extends JFrame {
         actions.logout();
     }
 
-    public void display(String key, TableData data) {
+    public void display(String key, DuLieuBang data) {
         Page page = pages.get(key);
         if (page == null) {
             return;
@@ -126,9 +126,9 @@ public final class MainView extends JFrame {
         if (page != null && page.recordsPanel != null) page.recordsPanel.resetSeriesView();
     }
 
-    public void displayDashboard(Map<String, Long> statistics, TableData books) {
+    public void displayDashboard(Map<String, Long> statistics, DuLieuBang books) {
         dashboard.removeAll();
-        dashboard.add(new DashboardPanel(statistics, books,
+        dashboard.add(new BangTongQuan(statistics, books,
                 () -> actions.navigate("books"), () -> actions.navigate("loans")), BorderLayout.CENTER);
         dashboard.revalidate();
         dashboard.repaint();
@@ -156,7 +156,7 @@ public final class MainView extends JFrame {
             }
         };
         sidebar.setBackground(new Color(23, 72, 57));
-        sidebar.setPreferredSize(new Dimension(LibraryBrandPanel.EXPANDED_WIDTH, 0));
+        sidebar.setPreferredSize(new Dimension(DauTrangThuVien.EXPANDED_WIDTH, 0));
         sidebar.setBorder(BorderFactory.createEmptyBorder(18, 12, 18, 12));
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
         addNavigation(sidebar, "dashboard", "⌂   Dashboard");
@@ -179,22 +179,22 @@ public final class MainView extends JFrame {
         top.setBorder(BorderFactory.createEmptyBorder(12, 20, 12, 20));
         title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
         title.setForeground(Color.WHITE);
-        JPanel heading = LibraryStyle.clear(new java.awt.GridBagLayout());
+        JPanel heading = GiaoDienChung.clear(new java.awt.GridBagLayout());
         heading.add(title);
         JPanel account = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         account.setOpaque(false);
         userLabel.setText(user.fullName() + " · " + user.role());
         userLabel.setForeground(Color.WHITE);
-        JButton logout = LibraryStyle.button("Đăng xuất", LibraryStyle.BEIGE, INK);
+        JButton logout = GiaoDienChung.button("Đăng xuất", GiaoDienChung.BEIGE, INK);
         logout.addActionListener(event -> logout());
         account.add(userLabel);
         account.add(logout);
         top.add(heading, BorderLayout.WEST);
-        JPanel accountHolder = LibraryStyle.clear(new java.awt.GridBagLayout());
+        JPanel accountHolder = GiaoDienChung.clear(new java.awt.GridBagLayout());
         accountHolder.add(account);
         top.add(accountHolder, BorderLayout.EAST);
 
-        LibraryBrandPanel brandArea = new LibraryBrandPanel();
+        DauTrangThuVien brandArea = new DauTrangThuVien();
         brandArea.addToggleListener(event -> {
             boolean expanded = !sidebar.isVisible();
             sidebar.setVisible(expanded);
@@ -208,14 +208,14 @@ public final class MainView extends JFrame {
 
         content.setBackground(CANVAS);
         content.setBorder(BorderFactory.createEmptyBorder(24, 24, 24, 24));
-        addPage("books", "Danh sách sách", RecordType.BOOKS);
-        addPage("readers", "Quản lý độc giả", RecordType.READERS);
-        addPage("employees", "Thủ thư & tài khoản", RecordType.EMPLOYEES);
+        addPage("books", "Danh sách sách", LoaiHoSo.BOOKS);
+        addPage("readers", "Quản lý độc giả", LoaiHoSo.READERS);
+        addPage("employees", "Thủ thư & tài khoản", LoaiHoSo.EMPLOYEES);
         addPage("loans", "Quản lý mượn / trả", null);
         addPage("penalties", "Phiếu phạt", null);
-        addPage("genres", CatalogType.THE_LOAI);
-        addPage("authors", CatalogType.TAC_GIA);
-        addPage("publishers", CatalogType.NHA_XUAT_BAN);
+        addPage("genres", LoaiDanhMuc.THE_LOAI);
+        addPage("authors", LoaiDanhMuc.TAC_GIA);
+        addPage("publishers", LoaiDanhMuc.NHA_XUAT_BAN);
         content.add(dashboard, "dashboard");
         root.add(header, BorderLayout.NORTH);
         root.add(sidebar, BorderLayout.WEST);
@@ -250,13 +250,13 @@ public final class MainView extends JFrame {
         return button;
     }
 
-    private void addPage(String key, String name, RecordType recordType) {
+    private void addPage(String key, String name, LoaiHoSo recordType) {
         Page page = new Page(key, name, recordType, null);
         pages.put(key, page);
         content.add(page.panel, key);
     }
 
-    private void addPage(String key, CatalogType catalogType) {
+    private void addPage(String key, LoaiDanhMuc catalogType) {
         Page page = new Page(key, catalogType.title(), null, catalogType);
         pages.put(key, page);
         content.add(page.panel, key);
@@ -286,27 +286,27 @@ public final class MainView extends JFrame {
     public String loanStatus() { return pages.get("loans").loansPanel.selectedStatus(); }
     public String penaltySearch() { return pages.get("penalties").penaltiesPanel.searchText(); }
     public void setLoanBusy(boolean busy) { pages.get("loans").loansPanel.setDetailsBusy(busy); }
-    public void refreshLoanDetails(String loanId, TableData data) { pages.get("loans").loansPanel.refreshDetails(loanId,data); }
+    public void refreshLoanDetails(String loanId, DuLieuBang data) { pages.get("loans").loansPanel.refreshDetails(loanId,data); }
 
     private final class Page {
         private final String title;
         private final JPanel panel = new JPanel(new BorderLayout());
-        private BooksPanel recordsPanel;
-        private LoansPanel loansPanel;
-        private PenaltiesPanel penaltiesPanel;
+        private BangDanhSachQuanLy recordsPanel;
+        private BangPhieuMuon loansPanel;
+        private BangPhieuPhat penaltiesPanel;
 
-        private Page(String key, String title, RecordType recordType, CatalogType catalogType) {
+        private Page(String key, String title, LoaiHoSo recordType, LoaiDanhMuc catalogType) {
             this.title = title;
             panel.setOpaque(false);
             if ("loans".equals(key)) {
-                loansPanel = new LoansPanel(() -> actions);
+                loansPanel = new BangPhieuMuon(() -> actions);
                 panel.add(loansPanel);
             } else if ("penalties".equals(key)) {
-                penaltiesPanel = new PenaltiesPanel(term -> actions.reload(key, term, "ALL"),
+                penaltiesPanel = new BangPhieuPhat(term -> actions.reload(key, term, "ALL"),
                         row -> actions.markPenaltyPaid(row));
                 panel.add(penaltiesPanel);
             } else {
-                recordsPanel = new BooksPanel(key, term -> actions.reload(key, term, "ALL"),
+                recordsPanel = new BangDanhSachQuanLy(key, term -> actions.reload(key, term, "ALL"),
                         () -> actions.add(key), row -> actions.edit(key, row),
                         user.isAdmin() ? row -> actions.delete(key, row) : null,
                         seriesTitle -> actions.addBookVolume(seriesTitle));
@@ -314,7 +314,7 @@ public final class MainView extends JFrame {
             }
         }
 
-        private void setData(TableData data) {
+        private void setData(DuLieuBang data) {
             if (loansPanel != null) loansPanel.setData(data);
             else if (penaltiesPanel != null) penaltiesPanel.setData(data);
             else {

@@ -1,24 +1,24 @@
 package controller;
 
-import dao.AccountDAO;
-import dao.BookDAO;
-import dao.CatalogDAO;
-import dao.EmployeeDAO;
-import dao.LoanDAO;
-import dao.ReaderDAO;
-import dao.RecordDAO;
-import dao.StatisticsDAO;
-import model.CatalogType;
-import model.LibraryUser;
-import model.RecordType;
-import model.TableData;
-import view.DangNhapView;
+import dao.DaoTaiKhoan;
+import dao.DaoSach;
+import dao.DaoDanhMuc;
+import dao.DaoNhanVien;
+import dao.DaoPhieuMuon;
+import dao.DaoDocGia;
+import dao.DaoHoSo;
+import dao.DaoThongKe;
+import model.LoaiDanhMuc;
+import model.NguoiDungThuVien;
+import model.LoaiHoSo;
+import model.DuLieuBang;
+import view.ManHinhDangNhap;
 import view.MainView;
-import view.RecordFormDialog;
-import view.RecordEditorPanel;
-import view.LoanEditorPanel;
-import view.CatalogEditorPanel;
-import view.EditorPopup;
+import view.HopThoaiXacNhan;
+import view.FormHoSo;
+import view.FormPhieuMuon;
+import view.FormDanhMuc;
+import view.HopThoaiChinhSua;
 
 import javax.swing.JTextField;
 import javax.swing.JLabel;
@@ -27,18 +27,18 @@ import java.awt.Component;
 import java.util.Map;
 
 public final class AppController {
-    private final AccountDAO accounts = new AccountDAO();
-    private final BookDAO books = new BookDAO();
-    private final ReaderDAO readers = new ReaderDAO();
-    private final EmployeeDAO employees = new EmployeeDAO();
-    private final CatalogDAO catalogs = new CatalogDAO();
-    private final LoanDAO loans = new LoanDAO();
-    private final StatisticsDAO statistics = new StatisticsDAO();
-    private DangNhapView loginFrame;
+    private final DaoTaiKhoan accounts = new DaoTaiKhoan();
+    private final DaoSach books = new DaoSach();
+    private final DaoDocGia readers = new DaoDocGia();
+    private final DaoNhanVien employees = new DaoNhanVien();
+    private final DaoDanhMuc catalogs = new DaoDanhMuc();
+    private final DaoPhieuMuon loans = new DaoPhieuMuon();
+    private final DaoThongKe statistics = new DaoThongKe();
+    private ManHinhDangNhap loginFrame;
     private MainView mainFrame;
-    private LibraryUser currentUser;
+    private NguoiDungThuVien currentUser;
 
-    private RecordDAO recordDAO(RecordType type) {
+    private DaoHoSo recordDAO(LoaiHoSo type) {
         return switch (type) {
             case BOOKS -> books;
             case READERS -> readers;
@@ -47,7 +47,7 @@ public final class AppController {
     }
 
     public void start() {
-        loginFrame = new DangNhapView();
+        loginFrame = new ManHinhDangNhap();
         loginFrame.setSubmitAction(this::login);
         loginFrame.showLogin();
     }
@@ -55,9 +55,9 @@ public final class AppController {
     private void login(String username, char[] password) {
         loginFrame.setBusy(true);
         loginFrame.showMessage("Đang xác thực...");
-        new SwingWorker<LibraryUser, Void>() {
+        new SwingWorker<NguoiDungThuVien, Void>() {
             @Override
-            protected LibraryUser doInBackground() throws Exception {
+            protected NguoiDungThuVien doInBackground() throws Exception {
                 return accounts.login(username, password);
             }
 
@@ -141,7 +141,7 @@ public final class AppController {
             @Override
             public void logout() {
                 currentUser = null;
-                loginFrame = new DangNhapView();
+                loginFrame = new ManHinhDangNhap();
                 loginFrame.setSubmitAction(AppController.this::login);
                 loginFrame.showLogin();
             }
@@ -151,10 +151,10 @@ public final class AppController {
     }
 
     private void reload(String page, String search, String status) {
-        new SwingWorker<TableData, Void>() {
+        new SwingWorker<DuLieuBang, Void>() {
             private Map<String, Long> loanStatistics;
             @Override
-            protected TableData doInBackground() throws Exception {
+            protected DuLieuBang doInBackground() throws Exception {
                 if ("loans".equals(page)) loanStatistics = statistics.dashboardStatistics();
                 return switch (page) {
                     case "books" -> books.listRecords(search);
@@ -165,9 +165,9 @@ public final class AppController {
                     }
                     case "loans" -> loans.listLoans(search, status);
                     case "penalties" -> loans.listPenalties(search);
-                    case "genres" -> catalogs.listCatalog(CatalogType.THE_LOAI, search);
-                    case "authors" -> catalogs.listCatalog(CatalogType.TAC_GIA, search);
-                    case "publishers" -> catalogs.listCatalog(CatalogType.NHA_XUAT_BAN, search);
+                    case "genres" -> catalogs.listCatalog(LoaiDanhMuc.THE_LOAI, search);
+                    case "authors" -> catalogs.listCatalog(LoaiDanhMuc.TAC_GIA, search);
+                    case "publishers" -> catalogs.listCatalog(LoaiDanhMuc.NHA_XUAT_BAN, search);
                     default -> throw new IllegalArgumentException("Màn hình không hợp lệ.");
                 };
             }
@@ -203,10 +203,10 @@ public final class AppController {
         }.execute();
     }
 
-    private record DashboardData(Map<String, Long> statistics, TableData books) { }
+    private record DashboardData(Map<String, Long> statistics, DuLieuBang books) { }
 
     private void addRecord(String page) {
-        CatalogType catalog = catalogType(page);
+        LoaiDanhMuc catalog = catalogType(page);
         if (catalog != null) {
             openCatalogEditor(page, catalog, null, null);
             return;
@@ -217,7 +217,7 @@ public final class AppController {
     private void addBookVolume(String seriesTitle) {
         new SwingWorker<String[], Void>() {
             @Override protected String[] doInBackground() throws Exception {
-                TableData series = books.listRecords(seriesTitle);
+                DuLieuBang series = books.listRecords(seriesTitle);
                 Object[] template = null;
                 int highestVolume = 0;
                 for (Object[] row : series.rows()) {
@@ -253,7 +253,7 @@ public final class AppController {
     }
 
     private void editRecord(String page, Object[] row) {
-        CatalogType catalog = catalogType(page);
+        LoaiDanhMuc catalog = catalogType(page);
         if (catalog != null) {
             String[] initial = new String[row.length - 1];
             for (int i = 1; i < row.length; i++) initial[i - 1] = row[i] == null ? "" : row[i].toString();
@@ -263,7 +263,7 @@ public final class AppController {
         openRecordEditor(page, row[0].toString());
     }
 
-    private static int catalogPopupHeight(CatalogType catalog) {
+    private static int catalogPopupHeight(LoaiDanhMuc catalog) {
         return switch (catalog) {
             case THE_LOAI -> 320;
             case TAC_GIA -> 410;
@@ -271,11 +271,11 @@ public final class AppController {
         };
     }
 
-    private void openCatalogEditor(String page, CatalogType catalog, String id, String[] initial) {
-        EditorPopup popup = id == null ? new EditorPopup(mainFrame,
+    private void openCatalogEditor(String page, LoaiDanhMuc catalog, String id, String[] initial) {
+        HopThoaiChinhSua popup = id == null ? new HopThoaiChinhSua(mainFrame,
                 "Thêm " + catalog.title().toLowerCase(java.util.Locale.ROOT), 560, catalogPopupHeight(catalog)) : null;
-        CatalogEditorPanel[] editor = new CatalogEditorPanel[1];
-        editor[0] = new CatalogEditorPanel(catalog, id != null, initial, values -> {
+        FormDanhMuc[] editor = new FormDanhMuc[1];
+        editor[0] = new FormDanhMuc(catalog, id != null, initial, values -> {
             editor[0].setBusy(true);
             if (popup != null) popup.setBusy(true);
             new SwingWorker<Void, Void>() {
@@ -299,19 +299,19 @@ public final class AppController {
         else mainFrame.displayForm("Chỉnh sửa " + catalog.title().toLowerCase(java.util.Locale.ROOT), page, editor[0]);
     }
 
-    private record EditorData(String[] stored, Map<CatalogType, TableData> catalogs) { }
+    private record EditorData(String[] stored, Map<LoaiDanhMuc, DuLieuBang> catalogs) { }
 
     private void openRecordEditor(String page, String id) {
         openRecordEditor(page, id, null);
     }
 
     private void openRecordEditor(String page, String id, String[] initialValues) {
-        RecordType type = recordType(page);
-        if (type == RecordType.EMPLOYEES) requireAdmin();
+        LoaiHoSo type = recordType(page);
+        if (type == LoaiHoSo.EMPLOYEES) requireAdmin();
         new SwingWorker<EditorData, Void>() {
             @Override protected EditorData doInBackground() throws Exception {
-                Map<CatalogType, TableData> catalogData = new java.util.EnumMap<>(CatalogType.class);
-                if (type == RecordType.BOOKS) for (CatalogType catalog : CatalogType.values())
+                Map<LoaiDanhMuc, DuLieuBang> catalogData = new java.util.EnumMap<>(LoaiDanhMuc.class);
+                if (type == LoaiHoSo.BOOKS) for (LoaiDanhMuc catalog : LoaiDanhMuc.values())
                     catalogData.put(catalog, catalogs.listCatalog(catalog, ""));
                 return new EditorData(id == null ? null : recordDAO(type).recordFormValues(id), catalogData);
             }
@@ -320,13 +320,13 @@ public final class AppController {
                     EditorData data = get();
                     String[] stored = data.stored();
                     String[] fields = initialValues != null ? initialValues.clone()
-                            : stored == null ? null : java.util.Arrays.copyOf(stored, type == RecordType.BOOKS ? 8 : 4);
-                    String[] account = stored == null || type != RecordType.EMPLOYEES ? null : new String[]{stored[4],
+                            : stored == null ? null : java.util.Arrays.copyOf(stored, type == LoaiHoSo.BOOKS ? 8 : 4);
+                    String[] account = stored == null || type != LoaiHoSo.EMPLOYEES ? null : new String[]{stored[4],
                             stored[5] == null || stored[5].isBlank() ? "THU_THU" : stored[5], stored[6]};
-                    EditorPopup popup = id == null && type == RecordType.READERS
-                            ? new EditorPopup(mainFrame, "Thêm độc giả", 820, 480) : null;
-                    RecordEditorPanel[] editor = new RecordEditorPanel[1];
-                    editor[0] = new RecordEditorPanel(type, id, fields, account, data.catalogs(),
+                    HopThoaiChinhSua popup = id == null && type == LoaiHoSo.READERS
+                            ? new HopThoaiChinhSua(mainFrame, "Thêm độc giả", 820, 480) : null;
+                    FormHoSo[] editor = new FormHoSo[1];
+                    editor[0] = new FormHoSo(type, id, fields, account, data.catalogs(),
                             AppController.this::quickAddCatalog,
                             values -> {
                                 editor[0].setBusy(true);
@@ -336,27 +336,27 @@ public final class AppController {
                             () -> { if (popup != null) popup.closeIfIdle();else reload(page, "", "ALL"); });
                     if (popup != null) popup.showEditor(editor[0]);
                     else mainFrame.displayForm((id == null ? "Thêm " : "Chỉnh sửa ") + type.title().toLowerCase(java.util.Locale.ROOT),
-                            id == null && type == RecordType.BOOKS ? "add-books" : page, editor[0]);
+                            id == null && type == LoaiHoSo.BOOKS ? "add-books" : page, editor[0]);
                 } catch (Exception exception) { showError("Không thể mở biểu mẫu: " + rootMessage(exception)); }
             }
         }.execute();
     }
 
-    private void quickAddCatalog(CatalogType catalog, java.util.function.Consumer<RecordEditorPanel.Choice> select) {
-        EditorPopup popup = new EditorPopup(mainFrame,"Thêm " + catalog.title().toLowerCase(java.util.Locale.ROOT),560,catalogPopupHeight(catalog));
-        CatalogEditorPanel[] editor = new CatalogEditorPanel[1];
-        editor[0] = new CatalogEditorPanel(catalog,false,null,values -> {
+    private void quickAddCatalog(LoaiDanhMuc catalog, java.util.function.Consumer<FormHoSo.Choice> select) {
+        HopThoaiChinhSua popup = new HopThoaiChinhSua(mainFrame,"Thêm " + catalog.title().toLowerCase(java.util.Locale.ROOT),560,catalogPopupHeight(catalog));
+        FormDanhMuc[] editor = new FormDanhMuc[1];
+        editor[0] = new FormDanhMuc(catalog,false,null,values -> {
             popup.setBusy(true);editor[0].setBusy(true);
-            new SwingWorker<RecordEditorPanel.Choice, Void>() {
-                @Override protected RecordEditorPanel.Choice doInBackground() throws Exception {
+            new SwingWorker<FormHoSo.Choice, Void>() {
+                @Override protected FormHoSo.Choice doInBackground() throws Exception {
                     catalogs.saveCatalog(catalog, null, values);
-                    TableData entries = catalogs.listCatalog(catalog, values[0].trim());
+                    DuLieuBang entries = catalogs.listCatalog(catalog, values[0].trim());
                     for (Object[] row : entries.rows()) if (row[1].toString().equalsIgnoreCase(values[0].trim()))
-                        return new RecordEditorPanel.Choice(row[0].toString(), row[1].toString());
+                        return new FormHoSo.Choice(row[0].toString(), row[1].toString());
                     throw new IllegalStateException("Không tìm thấy danh mục vừa tạo.");
                 }
                 @Override protected void done() {
-                    try { RecordEditorPanel.Choice choice=get();select.accept(choice);popup.dispose();showSaveSuccess(null); }
+                    try { FormHoSo.Choice choice=get();select.accept(choice);popup.dispose();showSaveSuccess(null); }
                     catch (Exception exception) { popup.setBusy(false);editor[0].showError("Không thể lưu: " + rootMessage(exception)); }
                 }
             }.execute();
@@ -364,12 +364,12 @@ public final class AppController {
         popup.showEditor(editor[0]);
     }
 
-    private void saveRecordFromEditor(RecordType type, String id, String[] values, String page, RecordEditorPanel editor, EditorPopup popup) {
-        int length = type == RecordType.BOOKS ? 8 : 4;
+    private void saveRecordFromEditor(LoaiHoSo type, String id, String[] values, String page, FormHoSo editor, HopThoaiChinhSua popup) {
+        int length = type == LoaiHoSo.BOOKS ? 8 : 4;
         new SwingWorker<Void, Void>() {
             @Override protected Void doInBackground() throws Exception {
                 String[] fields = java.util.Arrays.copyOf(values, length);
-                if (type == RecordType.EMPLOYEES) {
+                if (type == LoaiHoSo.EMPLOYEES) {
                     employees.saveWithAccount(id, fields, values[length], values[length + 1],
                             id != null ? values[length + 2] : "THU_THU",
                             Boolean.parseBoolean(values[length + 3]));
@@ -391,16 +391,16 @@ public final class AppController {
             return;
         }
         String id = row[0].toString();
-        if (!RecordFormDialog.confirm(mainFrame, "Xác nhận xóa",
+        if (!HopThoaiXacNhan.confirm(mainFrame, "Xác nhận xóa",
                 new JLabel("Bạn có chắc muốn xóa mã " + id + "?"), "Xóa")) {
             return;
         }
-        CatalogType catalog = catalogType(page);
+        LoaiDanhMuc catalog = catalogType(page);
         if (catalog != null) {
             runAction(() -> catalogs.deleteCatalog(catalog, id), page);
         } else {
-            RecordType type = recordType(page);
-            if (type == RecordType.EMPLOYEES && !currentUser.isAdmin()) {
+            LoaiHoSo type = recordType(page);
+            if (type == LoaiHoSo.EMPLOYEES && !currentUser.isAdmin()) {
                 showError("Chỉ ADMIN được quản lý nhân viên.");
                 return;
             }
@@ -409,15 +409,15 @@ public final class AppController {
     }
 
     private void createLoan() {
-        new SwingWorker<TableData[], Void>() {
-            @Override protected TableData[] doInBackground() throws Exception {
-                return new TableData[]{readers.listRecords(""), books.listRecords("")};
+        new SwingWorker<DuLieuBang[], Void>() {
+            @Override protected DuLieuBang[] doInBackground() throws Exception {
+                return new DuLieuBang[]{readers.listRecords(""), books.listRecords("")};
             }
             @Override protected void done() {
                 try {
-                    TableData[] data = get();
-                    LoanEditorPanel[] editor = new LoanEditorPanel[1];
-                    editor[0] = new LoanEditorPanel(data[0], data[1], request -> {
+                    DuLieuBang[] data = get();
+                    FormPhieuMuon[] editor = new FormPhieuMuon[1];
+                    editor[0] = new FormPhieuMuon(data[0], data[1], request -> {
                         editor[0].setBusy(true);
                         new SwingWorker<String, Void>() {
                             @Override protected String doInBackground() throws Exception {
@@ -426,7 +426,7 @@ public final class AppController {
                             @Override protected void done() {
                                 try {
                                     String loanId = get();
-                                    RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã lập phiếu mượn thành công."));
+                                    HopThoaiXacNhan.showContent(mainFrame, "Hoàn tất", new JLabel("Đã lập phiếu mượn thành công."));
                                     mainFrame.showLoan(loanId);
                                 }
                                 catch (Exception exception) { editor[0].showError("Không thể lập phiếu: " + rootMessage(exception)); }
@@ -466,7 +466,7 @@ public final class AppController {
             form.add(new JLabel("Số lượng báo mất (còn mượn: " + (borrowed - alreadyLost) + ")"));
             form.add(quantity);
             form.add(new JLabel("Giá phạt mỗi cuốn: " + money(unitPrice)));
-            if (!RecordFormDialog.confirm(mainFrame.loanActionParent(), "Lập phiếu phạt", form, "Lập phiếu phạt")) return;
+            if (!HopThoaiXacNhan.confirm(mainFrame.loanActionParent(), "Lập phiếu phạt", form, "Lập phiếu phạt")) return;
             int value = Integer.parseInt(quantity.getText().trim());
             if (value < 1 || value > borrowed - alreadyLost) {
                 showError("Số lượng báo mất phải từ 1 đến " + (borrowed - alreadyLost) + ".");
@@ -487,7 +487,7 @@ public final class AppController {
     }
 
     private boolean confirmLoanAction(String message) {
-        return RecordFormDialog.confirm(mainFrame.loanActionParent(), "Xác nhận trả sách", new JLabel(message), "Xác nhận");
+        return HopThoaiXacNhan.confirm(mainFrame.loanActionParent(), "Xác nhận trả sách", new JLabel(message), "Xác nhận");
     }
 
     private void markPenaltyPaid(Object[] row) {
@@ -496,7 +496,7 @@ public final class AppController {
             showError("Phiếu phạt này đã được thanh toán.");
             return;
         }
-        if (!RecordFormDialog.confirm(mainFrame, "Xác nhận thanh toán",
+        if (!HopThoaiXacNhan.confirm(mainFrame, "Xác nhận thanh toán",
                 new JLabel("Xác nhận đã thu tiền cho phiếu phạt " + penaltyId + "?"), "Đã thu tiền")) {
             return;
         }
@@ -509,7 +509,7 @@ public final class AppController {
             @Override protected void done() {
                 try {
                     get();
-                    RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã xác nhận thanh toán phiếu phạt."));
+                    HopThoaiXacNhan.showContent(mainFrame, "Hoàn tất", new JLabel("Đã xác nhận thanh toán phiếu phạt."));
                     reload("penalties", mainFrame.penaltySearch(), "ALL");
                 } catch (Exception exception) {
                     showError("Không thể xác nhận thanh toán: " + rootMessage(exception));
@@ -522,7 +522,7 @@ public final class AppController {
         return java.text.NumberFormat.getIntegerInstance(java.util.Locale.forLanguageTag("vi-VN")).format(amount) + " VNĐ";
     }
 
-    private record LoanRefresh(TableData list, TableData details, Map<String, Long> statistics) { }
+    private record LoanRefresh(DuLieuBang list, DuLieuBang details, Map<String, Long> statistics) { }
 
     private void runLoanAction(SqlAction action, String loanId) {
         runLoanAction(action, loanId, null);
@@ -547,7 +547,7 @@ public final class AppController {
                         mainFrame.display("loans",refreshed.list());
                         mainFrame.displayLoanStatistics(refreshed.statistics());
                         mainFrame.refreshLoanDetails(loanId,refreshed.details());
-                        if (receipt != null) RecordFormDialog.showContent(mainFrame, "Phiếu phạt", new JLabel("<html>" + receipt.replace("\n", "<br>") + "</html>"));
+                        if (receipt != null) HopThoaiXacNhan.showContent(mainFrame, "Phiếu phạt", new JLabel("<html>" + receipt.replace("\n", "<br>") + "</html>"));
                     }
                 } catch (Exception exception) {
                     showError((saved ? "Đã ghi nhận thao tác nhưng chưa tải lại được dữ liệu. Hãy đóng và mở lại phiếu: "
@@ -570,7 +570,7 @@ public final class AppController {
                 try {
                     get();
                     if (mainFrame.isDisplayable()) {
-                        RecordFormDialog.showContent(mainFrame, "Hoàn tất", new JLabel("Đã xóa thành công."));
+                        HopThoaiXacNhan.showContent(mainFrame, "Hoàn tất", new JLabel("Đã xóa thành công."));
                         reload(page, "", "ALL");
                     }
                 } catch (Exception exception) {
@@ -581,7 +581,7 @@ public final class AppController {
     }
 
     private void showSaveSuccess(String id) {
-        RecordFormDialog.showContent(mainFrame, "Hoàn tất",
+        HopThoaiXacNhan.showContent(mainFrame, "Hoàn tất",
                 new JLabel(id == null ? "Đã thêm thành công." : "Đã cập nhật thành công."));
     }
 
@@ -591,27 +591,27 @@ public final class AppController {
         }
     }
 
-    private RecordType recordType(String page) {
+    private LoaiHoSo recordType(String page) {
         return switch (page) {
-            case "books" -> RecordType.BOOKS;
-            case "readers" -> RecordType.READERS;
-            case "employees" -> RecordType.EMPLOYEES;
+            case "books" -> LoaiHoSo.BOOKS;
+            case "readers" -> LoaiHoSo.READERS;
+            case "employees" -> LoaiHoSo.EMPLOYEES;
             default -> throw new IllegalArgumentException("Loại hồ sơ không hợp lệ.");
         };
     }
 
-    private CatalogType catalogType(String page) {
+    private LoaiDanhMuc catalogType(String page) {
         return switch (page) {
-            case "genres" -> CatalogType.THE_LOAI;
-            case "authors" -> CatalogType.TAC_GIA;
-            case "publishers" -> CatalogType.NHA_XUAT_BAN;
+            case "genres" -> LoaiDanhMuc.THE_LOAI;
+            case "authors" -> LoaiDanhMuc.TAC_GIA;
+            case "publishers" -> LoaiDanhMuc.NHA_XUAT_BAN;
             default -> null;
         };
     }
 
     private void showError(String message) {
         Component parent = mainFrame != null ? mainFrame.loanActionParent() : loginFrame;
-        RecordFormDialog.showContent(parent, "Không thể hoàn tất", new JLabel(message));
+        HopThoaiXacNhan.showContent(parent, "Không thể hoàn tất", new JLabel(message));
     }
 
     private String rootMessage(Throwable exception) {

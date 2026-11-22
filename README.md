@@ -22,17 +22,17 @@ src/
 
 | File | Trách nhiệm |
 | --- | --- |
-| `AccountDAO.java` | Đăng nhập BCrypt và lưu tài khoản trên connection của nhân viên |
-| `BookDAO.java` | Danh sách, biểu mẫu, kiểm tra và quản lý sách |
-| `ReaderDAO.java` | Danh sách, biểu mẫu và quản lý độc giả |
-| `EmployeeDAO.java` | Quản lý nhân viên; lưu hồ sơ và tài khoản trong cùng transaction |
-| `CatalogDAO.java` | Thể loại, tác giả, nhà xuất bản |
-| `LoanDAO.java` | Danh sách phiếu, lập phiếu nhiều sách, trả sách và báo mất |
-| `StatisticsDAO.java` | Số liệu tổng quan và biểu đồ |
-| `RecordDAO.java` | Lớp cha dùng chung thao tác CRUD hồ sơ và transaction |
-| `DaoSupport.java` | Các hàm JDBC nội bộ: query, tham số, sinh mã và chuyển kiểu |
+| `DaoTaiKhoan.java` | Đăng nhập BCrypt và lưu tài khoản trên connection của nhân viên |
+| `DaoSach.java` | Danh sách, biểu mẫu, kiểm tra và quản lý sách |
+| `DaoDocGia.java` | Danh sách, biểu mẫu và quản lý độc giả |
+| `DaoNhanVien.java` | Quản lý nhân viên; lưu hồ sơ và tài khoản trong cùng transaction |
+| `DaoDanhMuc.java` | Thể loại, tác giả, nhà xuất bản |
+| `DaoPhieuMuon.java` | Danh sách phiếu, lập phiếu nhiều sách, trả sách và báo mất |
+| `DaoThongKe.java` | Số liệu tổng quan và biểu đồ |
+| `DaoHoSo.java` | Lớp cha dùng chung thao tác CRUD hồ sơ và transaction |
+| `HoTroDao.java` | Các hàm JDBC nội bộ: query, tham số, sinh mã và chuyển kiểu |
 
-`AppController` gọi trực tiếp các DAO theo chức năng; `DBConnection` tiếp tục mở kết nối Oracle. `LoanDAO` giữ toàn bộ transaction lập phiếu và chi tiết trên cùng connection. `EmployeeDAO` truyền connection của transaction vào `AccountDAO` khi lưu tài khoản.
+`AppController` gọi trực tiếp các DAO theo chức năng; `KetNoiOracle` tiếp tục mở kết nối Oracle. `DaoPhieuMuon` giữ toàn bộ transaction lập phiếu và chi tiết trên cùng connection. `DaoNhanVien` truyền connection của transaction vào `DaoTaiKhoan` khi lưu tài khoản.
 
 ## Yêu cầu
 
@@ -63,7 +63,7 @@ mvn clean compile exec:java
 
 Mở thư mục gốc dự án `QuanLyThuVien` trong VS Code. Cấu hình workspace trong `.vscode/settings.json` cho Code Runner: bấm **Run Code** trên file Java bất kỳ sẽ hỏi mật khẩu Oracle trong terminal rồi khởi chạy ứng dụng bằng Maven. Không chạy trực tiếp `javac <file>.java`, vì `javac` không nạp các thư viện BCrypt và Oracle JDBC được khai báo trong Maven. Cũng có thể chọn **Run QuanLyThuVien (Maven)** trong tab Run and Debug sau khi đã đặt `DB_PASSWORD` trong môi trường VS Code.
 
-Thông tin kết nối tương ứng Oracle SQL Developer: hostname `localhost`, port `1521`, service name `FREEPDB1`, username `thuthu`. Lệnh trên đọc mật khẩu mà không hiển thị khi gõ và ứng dụng không lưu mật khẩu vào source code. Đừng thêm mật khẩu vào giá trị mặc định trong `DBConnection.java`. Tài khoản đăng nhập giao diện là tài khoản ứng dụng trong bảng `TAIKHOAN` (ví dụ `admin` nếu đã tạo dữ liệu mẫu); đây là tài khoản riêng với tài khoản kết nối Oracle.
+Thông tin kết nối tương ứng Oracle SQL Developer: hostname `localhost`, port `1521`, service name `FREEPDB1`, username `thuthu`. Lệnh trên đọc mật khẩu mà không hiển thị khi gõ và ứng dụng không lưu mật khẩu vào source code. Đừng thêm mật khẩu vào giá trị mặc định trong `KetNoiOracle.java`. Tài khoản đăng nhập giao diện là tài khoản ứng dụng trong bảng `TAIKHOAN` (ví dụ `admin` nếu đã tạo dữ liệu mẫu); đây là tài khoản riêng với tài khoản kết nối Oracle.
 
 ## Chức năng
 
@@ -96,8 +96,8 @@ Chạy kiểm tra với JDBC mô phỏng, không kết nối hoặc ghi vào Ora
 
 ```bash
 mvn -o compile
-javac --release 17 -cp target/classes -d target/dao-check tools/VerifyDaoTransactions.java
-java -cp "target/dao-check:target/classes:$HOME/.m2/repository/org/mindrot/jbcrypt/0.4/jbcrypt-0.4.jar" VerifyDaoTransactions
+javac --release 17 -cp target/classes -d target/dao-check tools/KiemTraGiaoDichDao.java
+java -cp "target/dao-check:target/classes:$HOME/.m2/repository/org/mindrot/jbcrypt/0.4/jbcrypt-0.4.jar" KiemTraGiaoDichDao
 ```
 
 Chín tình huống kiểm tra: commit phiếu và chi tiết, rollback khi thiếu sách, từ chối trả lặp, báo mất một phần/toàn bộ/vượt số lượng, lưu nhân viên cùng tài khoản, rollback hồ sơ khi tài khoản không hợp lệ và chặn xóa chính nhân viên đang đăng nhập. Kiểm tra này không thay thế kiểm thử tích hợp Oracle/trigger.
