@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.Arrays;
 
-/** Input rules shared by forms and DAOs. Optional schema fields remain optional. */
+/** Quy tắc kiểm tra dữ liệu dùng chung cho biểu mẫu và DAO; trường không bắt buộc vẫn được để trống. */
 public final class KiemTraDuLieu {
     private KiemTraDuLieu() { }
 
@@ -79,7 +79,7 @@ public final class KiemTraDuLieu {
     }
 
     public static void account(String username, String password, String role, boolean newAccount) {
-        // VARCHAR2(50) uses the database's byte semantics by default.
+        // VARCHAR2(50) mặc định giới hạn theo số byte trong cơ sở dữ liệu.
         String clean = text(username, "Tên đăng nhập", 50, true);
         if (clean.getBytes(StandardCharsets.UTF_8).length > 50)
             throw new IllegalArgumentException("Tên đăng nhập vượt quá 50 byte UTF-8.");

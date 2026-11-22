@@ -4,7 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import static view.GiaoDienChung.*;
 
-/** Shared page navigation; the owner supplies the ordered items for each page. */
+/** Thanh chuyển trang dùng chung; màn hình gọi thành phần này cung cấp danh sách đã sắp xếp. */
 final class ThanhPhanTrang extends JPanel {
     private final JLabel count=label("Hiển thị 0 trên 0",13,false,MUTED);
     private final JComboBox<Integer> size=new JComboBox<>(new Integer[]{5,10,20});

@@ -10,7 +10,7 @@ import java.sql.SQLException;
 
 import static dao.HoTroDao.*;
 
-/** Shared CRUD mechanics; concrete DAOs provide their own SQL and validation. */
+/** Chứa thao tác CRUD dùng chung; từng DAO cung cấp câu SQL và cách kiểm tra riêng. */
 public abstract class DaoHoSo {
     private final String table;
     private final String idColumn;

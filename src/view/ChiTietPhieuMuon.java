@@ -9,7 +9,7 @@ import java.time.LocalDate;
 import java.util.List;
 import static view.GiaoDienChung.*;
 
-/** Loan details and per-book actions used by the resizable details popup. */
+/** Hiển thị chi tiết phiếu mượn và thao tác trên từng sách trong hộp thoại co giãn được. */
 final class ChiTietPhieuMuon extends JPanel {
     private final List<Object[]> records;
     private final Consumer<Object[]> returnBook;

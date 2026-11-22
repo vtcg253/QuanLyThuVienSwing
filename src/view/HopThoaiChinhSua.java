@@ -4,7 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 
-/** Modal host for editor panels with their own save/cancel controls. */
+/** Hộp thoại chứa biểu mẫu có nút lưu và hủy riêng. */
 public final class HopThoaiChinhSua extends JDialog {
     private boolean busy;
 

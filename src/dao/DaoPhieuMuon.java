@@ -98,7 +98,7 @@ public final class DaoPhieuMuon {
         try (Connection connection = KetNoiOracle.getConnection()) {
             connection.setAutoCommit(false);
             try {
-                // Serialize new loans for the same reader before checking their open loans.
+                // Tuần tự hóa việc lập phiếu của cùng độc giả trước khi kiểm tra phiếu chưa trả.
                 if (!exists(connection, "SELECT 1 FROM DOCGIA WHERE MADG = ? FOR UPDATE", readerId)) {
                     throw new SQLException("Không tìm thấy độc giả " + readerId + ".");
                 }

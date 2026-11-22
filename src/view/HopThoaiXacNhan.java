@@ -28,7 +28,7 @@ public final class HopThoaiXacNhan {
         JDialog dialog = new JDialog(owner, title, java.awt.Dialog.ModalityType.APPLICATION_MODAL);
         JPanel card = GiaoDienChung.card(new java.awt.BorderLayout(0, 22));
         card.add(GiaoDienChung.label(title, 24, true, GiaoDienChung.INK), java.awt.BorderLayout.NORTH);
-        // Editable forms need default control styling. Read-only content owns its presentation.
+        // Biểu mẫu cần kiểu điều khiển mặc định; nội dung chỉ đọc tự định dạng giao diện.
         if (editable) style(content);
         card.add(content, java.awt.BorderLayout.CENTER);
         JPanel buttons = GiaoDienChung.clear(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 8, 0));

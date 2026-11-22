@@ -4,7 +4,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
 
-/** The brand contracts to just the menu button when navigation is hidden. */
+/** Khi ẩn thanh điều hướng, phần thương hiệu chỉ còn nút mở trình đơn. */
 final class DauTrangThuVien extends JPanel {
     static final int EXPANDED_WIDTH = 260;
     private final JPanel text = GiaoDienChung.clear(new BorderLayout(0, 4));
@@ -28,7 +28,7 @@ final class DauTrangThuVien extends JPanel {
         c.weightx = 1;
         c.anchor = GridBagConstraints.WEST;
         words.add(text, c);
-        // Hide this whole container, including its reserved layout space.
+        // Ẩn toàn bộ vùng chứa và cả khoảng trống bố cục đã dành cho nó.
         textContainer = words;
         add(words, BorderLayout.CENTER);
         setExpanded(true);

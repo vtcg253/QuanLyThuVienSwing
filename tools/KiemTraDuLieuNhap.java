@@ -1,7 +1,7 @@
 import model.*;
 import java.time.LocalDate;
 
-/** Boundary checks for shared form/DAO input rules; no database connection. */
+/** Kiểm tra giới hạn dữ liệu dùng chung giữa biểu mẫu và DAO; không kết nối cơ sở dữ liệu. */
 public class KiemTraDuLieuNhap {
     private static int checks;
     private static void accepted(Runnable action) { action.run(); checks++; }

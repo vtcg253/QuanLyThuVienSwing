@@ -3,8 +3,8 @@ import java.sql.*;
 import java.util.*;
 import java.nio.file.*;
 
-/** One-time migration: keep existing IDs; replace DM IDs using normal application prefixes.
- * Run without --apply to preview. No DDL or trigger changes. All writes share one transaction.
+/** Công cụ chuyển mã một lần: giữ mã hợp lệ, đổi mã DM sang tiền tố ứng dụng.
+ * Chạy không có --apply để xem trước. Không đổi cấu trúc bảng hay trigger. Mọi thay đổi nằm trong một giao dịch.
  */
 public final class ChuanHoaMaMau {
     record Kind(String table, String key, String prefix) {}
@@ -26,7 +26,7 @@ public final class ChuanHoaMaMau {
             s.setString(1,table);try(ResultSet r=s.executeQuery()){while(r.next())out.add(r.getString(1));}
         } return out;
     }
-    // Compare every value before/after, translating only actual identifier columns.
+    // So sánh dữ liệu trước và sau; chỉ chuyển đổi các cột mã định danh thực tế.
     static List<String> snapshot(Connection c,List<Change> changes) throws SQLException {
         List<String> result=new ArrayList<>();
         Map<String,Map<String,String>> maps=new HashMap<>();
@@ -74,7 +74,7 @@ public final class ChuanHoaMaMau {
                     Kind k=ch.kind;List<String> cols=columns(c,k.table);
                     String selection=String.join(",",cols.stream().map(col->col.equals(k.key)?"?":col).toList());
                     if(execute(c,"INSERT INTO "+k.table+" ("+String.join(",",cols)+") SELECT "+selection+" FROM "+k.table+" WHERE "+k.key+"=?",ch.newId,ch.oldId)!=1)throw new SQLException("Cannot copy "+ch.oldId);
-                    // Discover actual referencing columns from Oracle metadata.
+                    // Tìm các cột tham chiếu thực tế từ thông tin cấu trúc Oracle.
                     try(PreparedStatement s=c.prepareStatement("SELECT cc.TABLE_NAME,cc.COLUMN_NAME FROM USER_CONSTRAINTS fk JOIN USER_CONSTRAINTS pk ON pk.CONSTRAINT_NAME=fk.R_CONSTRAINT_NAME JOIN USER_CONS_COLUMNS cc ON cc.CONSTRAINT_NAME=fk.CONSTRAINT_NAME WHERE fk.CONSTRAINT_TYPE='R' AND pk.TABLE_NAME=?")){
                         s.setString(1,k.table);try(ResultSet r=s.executeQuery()){
                             while(r.next())execute(c,"UPDATE "+r.getString(1)+" SET "+r.getString(2)+"=? WHERE "+r.getString(2)+"=?",ch.newId,ch.oldId);

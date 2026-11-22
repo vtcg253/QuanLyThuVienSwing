@@ -10,8 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Dashboard charts are drawn from database values, without an external chart
- * dependency.
+ * Biểu đồ tổng quan được vẽ từ dữ liệu cơ sở dữ liệu, không cần thư viện biểu đồ bên ngoài.
  */
 final class BangTongQuan extends JPanel {
     private static final Color INK = new Color(30, 47, 40);
@@ -254,7 +253,7 @@ final class BangTongQuan extends JPanel {
             rows.removeIf(row -> value(row, 3) == 0);
             rows.sort(Comparator.comparingLong((Object[] row) -> value(row, 3)).reversed());
             total = rows.stream().mapToLong(row -> value(row, 3)).sum();
-            // Keep the legend compact; the final segment includes all remaining books.
+            // Giữ chú giải gọn; mục cuối cùng gộp các sách còn lại.
             if (rows.size() > 6) {
                 long other = rows.subList(5, rows.size()).stream().mapToLong(row -> value(row, 3)).sum();
                 rows.subList(5, rows.size()).clear();

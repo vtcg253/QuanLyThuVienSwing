@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
 
-/** Optional birth date: numeric input with fixed day/month/year separators. */
+/** Ô ngày sinh không bắt buộc; chỉ nhập số, dấu ngăn cách ngày/tháng/năm được cố định. */
 final class ONhapNgaySinh extends JFormattedTextField {
     private static final DateTimeFormatter DISPLAY = DateTimeFormatter.ofPattern("dd/MM/uuuu")
             .withResolverStyle(ResolverStyle.STRICT);

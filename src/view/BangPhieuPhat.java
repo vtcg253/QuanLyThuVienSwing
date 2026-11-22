@@ -31,7 +31,7 @@ import java.util.function.Consumer;
 
 import static view.GiaoDienChung.*;
 
-/** Lists each loss report as a separate penalty receipt and records its payment state. */
+/** Hiển thị từng lần báo mất thành phiếu phạt riêng và theo dõi trạng thái thanh toán. */
 final class BangPhieuPhat extends JPanel {
     private final JTextField search = new JTextField();
     private final JTable table = new JTable() {
@@ -149,7 +149,7 @@ final class BangPhieuPhat extends JPanel {
         paid.setText(Integer.toString(paidCount));
         outstanding.setText(money(outstandingAmount));
 
-        // Keep the list scannable. The detail dialog contains the full receipt.
+        // Giữ danh sách ngắn gọn; hộp thoại chi tiết hiển thị đầy đủ phiếu phạt.
         String[] columns = {"Mã phạt", "Ngày lập", "Phiếu mượn", "Độc giả", "Tên sách", "Thành tiền (VNĐ)", "Trạng thái", "Thao tác"};
         int[] sourceColumns = {0, 1, 2, 3, 6, 9, 10};
         Object[][] rows = new Object[data.rows().size()][columns.length];

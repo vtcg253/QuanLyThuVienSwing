@@ -6,7 +6,7 @@ import javax.swing.table.*;
 import java.awt.*;
 import java.util.function.Consumer;
 
-/** Book catalogue styled to match the library's cream and green design. */
+/** Bảng sách và danh mục, dùng chung giao diện màu kem và xanh của thư viện. */
 final class BangDanhSachQuanLy extends JPanel {
     private static final Color PAPER = new Color(255, 253, 249);
     private static final Color INK = new Color(30, 47, 40);
@@ -155,7 +155,7 @@ final class BangDanhSachQuanLy extends JPanel {
         });
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createEmptyBorder());
-        // Keep the footer visible while the rows scroll inside the table.
+        // Giữ thanh phân trang luôn hiển thị khi cuộn các dòng trong bảng.
         scroll.setColumnHeaderView(table.getTableHeader());
         scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
@@ -172,7 +172,7 @@ final class BangDanhSachQuanLy extends JPanel {
             else renderSeriesVolumes();
             return;
         }
-        // Detach the previous page filter before replacing the result set.
+        // Gỡ bộ lọc trang cũ trước khi thay danh sách kết quả.
         table.setRowSorter(null);
         sourceRows = data.rows();
         dataColumns = "employees".equals(page) ? 5 : data.columns().length;
@@ -181,7 +181,7 @@ final class BangDanhSachQuanLy extends JPanel {
                 : java.util.Arrays.copyOf(data.columns(), dataColumns + 1);
         headers[dataColumns] = bookMode ? "" : "Thao tác";
         if (!bookMode) headers[0] = "Mã";
-        // Short headings leave space for the title and author columns.
+        // Tiêu đề ngắn để dành chỗ cho tên sách và tác giả.
         Object[][] rows = new Object[data.rows().size()][dataColumns + 1];
         for (int i = 0; i < rows.length; i++) {
             Object[] source = data.rows().get(i);
@@ -371,7 +371,7 @@ final class BangDanhSachQuanLy extends JPanel {
     private void applyPage() {
         if (!(table.getRowSorter() instanceof TableRowSorter<?> sorter)) return;
         if (table.isEditing()) table.getCellEditor().cancelCellEditing();
-        // Sort the full result first so sorting remains correct across page boundaries.
+        // Sắp xếp toàn bộ kết quả trước để thứ tự đúng giữa các trang.
         TableRowSorter<javax.swing.table.TableModel> ordered = new TableRowSorter<>(table.getModel());
         ordered.setSortKeys(sorter.getSortKeys());
         java.util.BitSet included = new java.util.BitSet(table.getModel().getRowCount());
